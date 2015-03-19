@@ -12,6 +12,7 @@ from circuits.net.sockets import UDPServer
 import dnslib as dl
 from collections import defaultdict
 from datetime import datetime
+import mysql.connector
 
 def parseQueryString(qnm):
     tokens = qnm.split('.')
@@ -23,6 +24,10 @@ def parseQueryString(qnm):
         else:
             res[t[0]] = True
     return res
+    
+add_query_db = ("INSERT INTO queries "
+               "(exp_id, src_ip, src_port, query, trans_id, ip_id) "
+               "VALUES (%s, %s, %s, %s, %s, %s)")
 
 class AServer(UDPServer):
     @handler("read")
@@ -49,6 +54,27 @@ class AServer(UDPServer):
             reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
                 rdata=dl.TXT(("RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | TIME=%s" % (addr[0],\
                 addr[1], qname, qid, datetime.utcnow()))), ttl=10)) # A negligable TTL
+        elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
+            # Validate the query
+            exp_id = parseQueryString(qnm)['exp_id']
+            if not exp_id:
+                raise Exception('exp_id missing')
+
+            # Insert into the database
+            cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
+            data = (exp_id, addr[0], addr[1], qname, qid, 0)
+            try:
+                cursor = cnx.cursor()
+                cursor.execute(add_query_db, data)
+                qid = cursor.lastrowid
+                cnx.commit()
+                cursor.close()
+            finally:
+                cnx.close()
+                
+            # Return a cname to the website
+            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
+                rdata=dl.CNAME("schomp.info"), ttl=10))
         else:
             # Error
             reply.header.rcode = dl.RCODE.NXDOMAIN
@@ -75,6 +101,8 @@ if __name__ == "__main__":
                                      description='A simple authoritative DNS server implementation')
     parser.add_argument('-a', '--address', default='0.0.0.0:53', help='Address to bind upon')                                     
     parser.add_argument('-m', '--mapping', default=None, type=str, help='File containing name to address mappings')
+    parser.add_argument('-u', '--username', default='root')
+    parser.add_argument('-p', '--password', default=None)
     parser.add_argument('-q', '--quiet', action='store_true', default=False, help='only print errors')
     parser.add_argument('-v', '--verbose', action='store_true', default=False, help='print debug info. --quiet wins if both are present')
     args = parser.parse_args()
