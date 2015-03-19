@@ -57,20 +57,18 @@ class AServer(UDPServer):
         elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
             # Validate the query
             exp_id = parseQueryString(qnm)['exp_id']
-            if not exp_id:
-                raise Exception('exp_id missing')
-
-            # Insert into the database
-            cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
-            data = (exp_id, addr[0], addr[1], str(qname), qid, 0)
-            try:
-                cursor = cnx.cursor()
-                cursor.execute(add_query_db, data)
-                qid = cursor.lastrowid
-                cnx.commit()
-                cursor.close()
-            finally:
-                cnx.close()
+            if exp_id:
+                # Insert into the database
+                cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
+                data = (exp_id, addr[0], addr[1], str(qname), qid, 0)
+                try:
+                    cursor = cnx.cursor()
+                    cursor.execute(add_query_db, data)
+                    qid = cursor.lastrowid
+                    cnx.commit()
+                    cursor.close()
+                finally:
+                    cnx.close()
                 
             # Return a cname to the website
             reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
