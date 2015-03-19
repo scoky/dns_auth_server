@@ -39,7 +39,7 @@ class AServer(UDPServer):
         qclass = dl.CLASS[request.q.qclass]
         qtype = dl.QTYPE[request.q.qtype]
         
-        logging.info("Request from (%s) for (%s %s %s)", addr, qnm, qclass, qtype)
+        logging.info("Request id:%s from (%s) for (%s %s %s)", qid, addr, str(qname), qclass, qtype)
 
         reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=1), q=request.q)        
         
