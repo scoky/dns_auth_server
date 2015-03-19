@@ -62,7 +62,7 @@ class AServer(UDPServer):
 
             # Insert into the database
             cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
-            data = (exp_id, addr[0], addr[1], qname, qid, 0)
+            data = (exp_id, addr[0], addr[1], str(qname), qid, 0)
             try:
                 cursor = cnx.cursor()
                 cursor.execute(add_query_db, data)
