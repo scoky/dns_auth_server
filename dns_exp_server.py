@@ -44,7 +44,7 @@ class RawUdpServer(object):
                 udppkt = ippkt.data
                 
                 # Ignore packets not destined for us
-                if udppkt.dport != self.port or ippkt.dst != self.addr:
+                if udppkt.dport != self.port: # or ippkt.dst != self.addr:
                     continue
 
                 # Process the packet
