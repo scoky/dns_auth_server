@@ -57,6 +57,7 @@ class AServer(RawUdpServer):
         if response.header.rcode == 0 and response.header.a > 0 and addr[0] in self.resolvers:
             for data in self.resolvers[addr[0]]:
                 data.open = True
+            del self.resolvers[addr[0]]
         
     def read_request(self, ip_header, udp_header, addr, request):
         qid = request.header.id
@@ -79,7 +80,7 @@ class AServer(RawUdpServer):
         elif request.q.qtype == dl.QTYPE.TXT:
             reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
                 rdata=dl.TXT(("RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
-                addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=10)) # A negligable TTL
+                addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=60)) # A negligable TTL
         elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
             # Validate the query
             exp_id = parseQueryString(qnm)['exp_id']
@@ -90,7 +91,7 @@ class AServer(RawUdpServer):
                 
             # Return a cname to the website
             reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
-                rdata=dl.CNAME("schomp.info"), ttl=10))
+                rdata=dl.CNAME("schomp.info"), ttl=60))
         # TODO: Add other tools HERE!
         else:
             # Error
@@ -102,7 +103,7 @@ class AServer(RawUdpServer):
         lst = self.resolvers[data.src_ip]
         lst.append(data)
         # Limit the number of probes that we send
-        if len(lst) <= 2:
+        if len(lst) % 4 == 1:
             logging.info('Testing if %s is an open resolver', data.src_ip)
             query = dl.DNSRecord.question("google.com") # Arbitrary domain name
             self.write((data.src_ip, 53), query.pack()) 
