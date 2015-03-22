@@ -11,7 +11,7 @@ from circuits import handler,Debugger
 from circuits.net.sockets import UDPServer
 import dnslib as dl
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime,timedelta
 import mysql.connector
 
 def parseQueryString(qnm):

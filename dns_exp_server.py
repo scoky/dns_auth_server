@@ -5,12 +5,14 @@ import os
 import logging
 import argparse
 import traceback
+import mysql.connector
 import dnslib as dl
 from collections import defaultdict
-from datetime import datetime
-#import mysql.connector
-import dpkt
-import socket, random
+from datetime import datetime,timedelta
+from raw_server import RawUdpServer
+from threading import Thread,Timer
+import Queue
+import time
 
 def parseQueryString(qnm):
     tokens = qnm.split('.')
@@ -22,57 +24,41 @@ def parseQueryString(qnm):
         else:
             res[t[0]] = True
     return res
-    
-add_query_db = ("INSERT INTO queries "
-               "(exp_id, src_ip, src_port, query, trans_id, ip_id) "
-               "VALUES (%s, %s, %s, %s, %s, %s)")
-               
-class RawUdpServer(object):
-    def __init__(self, addr):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_UDP)
-        self.sock.bind(addr)
-        self.running = False
-        self.addr = socket.inet_aton(addr[0])
-        self.port = addr[1]
-        
-    def run(self):
-        self.running = True
-        while self.running:
-            try:
-                data = self.sock.recv(4096)
-                ippkt = dpkt.ip.IP(data)
-                udppkt = ippkt.data
-                
-                # Ignore packets not destined for us
-                if udppkt.dport != self.port: # or ippkt.dst != self.addr:
-                    continue
 
-                # Process the packet
-                self.read(ippkt, udppkt, (socket.inet_ntoa(ippkt.src), udppkt.sport), udppkt.data)
-            except Exception as e:
-                logging.error('Error on recv: %s\n%s', e, traceback.format_exc())
-        self.running = False
-        
-    def read(self, ip_header, udp_header, saddr, data):
-        print "RECV:", socket.inet_ntoa(ip_header.src), udp_header.sport
-        self.write(data, (socket.inet_ntoa(ip_header.src), udp_header.sport))
-        pass
-        
-    def terminate(self):
-        self.running = False
-        # Wait for run to return
-        self.sock.close()
-        
-    def write(self, daddr, data):
-        udpdata = dpkt.udp.UDP(sport = self.port, dport = daddr[1], data = data)
-        udpdata.ulen = len(udpdata)
-        # Cannot generate own IP header (i.e., no spoofing)
-        #ipdata = dpkt.ip.IP(src = self.addr, dst = socket.inet_aton(daddr[0]), data = udpdata)
-        self.sock.sendto(str(udpdata), daddr)
-
+# Authoritative DNS server for experiments
 class AServer(RawUdpServer):
+    def __init__(self, *args):
+        super(AServer, self).__init__(*args)
+        self.inserter = DatabaseInserter()
+        self.resolvers = defaultdict(list)
+
+    def run(self):
+        self.inserter.start()
+        try:
+            super(AServer, self).run()
+        finally:
+            self.inserter.terminate()
+
     def read(self, ip_header, udp_header, addr, data):
-        request = dl.DNSRecord.parse(data)
+        packet = dl.DNSRecord.parse(data)
+        if packet.header.qr:
+            self.read_response(ip_header, udp_header, addr, packet)
+        else:
+            self.read_request(ip_header, udp_header, addr, packet)
+
+    def read_response(self, ip_header, udp_header, addr, response):
+        qid = response.header.id
+        qname = response.q.qname
+        qclass = dl.CLASS[response.q.qclass]
+        qtype = dl.QTYPE[response.q.qtype]
+        
+        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, str(qname), qclass, qtype)
+
+        if response.header.rcode == 0 and response.header.a > 0 and addr[0] in self.resolvers:
+            for data in self.resolvers[addr[0]]:
+                data.open = True
+        
+    def read_request(self, ip_header, udp_header, addr, request):
         qid = request.header.id
         qname = request.q.qname
         qnm = str(qname).lower()
@@ -98,17 +84,9 @@ class AServer(RawUdpServer):
             # Validate the query
             exp_id = parseQueryString(qnm)['exp_id']
             if exp_id:
-                # Insert into the database
-                cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
-                data = (exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
-                try:
-                    cursor = cnx.cursor()
-                    cursor.execute(add_query_db, data)
-                    qid = cursor.lastrowid
-                    cnx.commit()
-                    cursor.close()
-                finally:
-                    cnx.close()
+                data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
+                self.inserter.addItem(data)
+                self.check_resolver(data)
                 
             # Return a cname to the website
             reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
@@ -119,6 +97,12 @@ class AServer(RawUdpServer):
             reply.header.rcode = dl.RCODE.NXDOMAIN
         
         self.write(addr, reply.pack())
+        
+    def check_resolver(self, data):
+        self.resolvers[data.src_ip].append(data)
+        if len(self.resolvers[data.src_ip]) < 4:
+            query = dl.DNSRecord.question("google.com") # Arbitrary domain name
+            self.write((data.src_ip, 53), query.pack())
 
     def refresh_records(self):        
         records = {}
@@ -134,10 +118,79 @@ class AServer(RawUdpServer):
                logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
         self.records = records
 
+
+add_query_db = ("INSERT INTO queries "
+               "(exp_id, src_ip, src_port, query, trans_id, ip_id, open) "
+               "VALUES (%s, %s, %s, %s, %s, %s, %s)")
+               
+class QueryData(object):
+    def __init__(self, exp_id, src_ip, src_port, query, trans_id, ip_id):
+        self.exp_id = exp_id
+        self.src_ip = src_ip
+        self.src_port = src_port
+        self.query = query
+        self.trans_id = trans_id
+        self.ip_id = ip_id
+        self.open = False
+        self.time = datetime.utcnow() + timedelta(seconds=1)
+        
+    def insert_tuple(self):
+        return (self.exp_id, self.src_ip, self.src_port, self.query, self.trans_id, self.ip_id, int(self.open))
+               
+class DatabaseInserter(Thread):
+    def __init__(self, *args):
+        super(DatabaseInserter, self).__init__(*args)
+        self.que = Queue.Queue()
+        self.running = False
+        
+    def wait_item(self, item):
+        while item.time > datetime.utcnow():
+            time.sleep(1)
+            
+    def addItem(self, item):
+        self.que.put(item)
+
+    def run(self):
+        self.running = True
+        while self.running:
+            data = []
+            # Get an item
+            data.append(self.que.get(block=True))
+            # Wait for item time
+            self.wait_item(data[0])
+            # Collect all other items waiting in the queue
+            while not self.que.empty():
+                try:
+                    data.append(self.que.get(block=False))
+                except Queue.Empty:
+                    break
+            # Wait until the last item time
+            self.wait_item(data[-1])
+            # Convert to database format
+            data = [i.insert_tuple() for i in data]
+            
+            cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
+            try:
+                cursor = cnx.cursor()
+                cursor.executemany(add_query_db, data)
+                cnx.commit()
+                cursor.close()
+            except Exception as e:
+                logging.error('Error on database: %s\n%s', e, traceback.format_exc())
+            finally:
+                cnx.close()
+        self.running = False
+                
+    def terminate(self):
+        logging.info('Inserter terminating')
+        self.running = False
+        self.addItem(None)
+        self.join()
+        
 if __name__ == "__main__":
     # set up command line args
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,\
-                                     description='A simple authoritative DNS server implementation')
+                                     description='A simple authoritative DNS server implementation for experiments')
     parser.add_argument('-a', '--address', default='0.0.0.0:53', help='Address to bind upon')                                     
     parser.add_argument('-m', '--mapping', default=None, type=str, help='File containing name to address mappings')
     parser.add_argument('-u', '--username', default='root')
@@ -162,4 +215,7 @@ if __name__ == "__main__":
         level = level
     )
 
-    server.run()
+    try:
+        server.run()
+    finally:
+        server.terminate()

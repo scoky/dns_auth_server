@@ -18,6 +18,7 @@ TABLES['queries'] = (
     "  `query` varchar(255) NOT NULL,"
     "  `trans_id` int NOT NULL,"
     "  `ip_id` int NOT NULL,"
+    "  `open` tinyint NOT NULL,"
     "  `time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
     "  PRIMARY KEY (`qid`)"
     ") ENGINE=InnoDB")
