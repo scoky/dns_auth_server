@@ -127,8 +127,8 @@ class AServer(RawUdpServer):
 
 
 add_query_db = ("INSERT INTO queries "
-               "(exp_id, src_ip, src_port, query, trans_id, ip_id, open) "
-               "VALUES (%s, %s, %s, %s, %s, %s, %s)")
+               "(exp_id, src_ip, src_port, query, trans_id, ip_id, open, time) "
+               "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)")
                
 class QueryData(object):
     def __init__(self, exp_id, src_ip, src_port, query, trans_id, ip_id):
@@ -139,10 +139,11 @@ class QueryData(object):
         self.trans_id = trans_id
         self.ip_id = ip_id
         self.open = False
+        self.dbtime = datetime.utcnow()
         self.time = datetime.utcnow() + timedelta(seconds=2)
         
     def insert_tuple(self):
-        return (self.exp_id, self.src_ip, self.src_port, self.query, self.trans_id, self.ip_id, int(self.open))
+        return (self.exp_id, self.src_ip, self.src_port, self.query, self.trans_id, self.ip_id, int(self.open), self.dbtime)
                
 class DatabaseInserter(Thread):
     def __init__(self, *args):
