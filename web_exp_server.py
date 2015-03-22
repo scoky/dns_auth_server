@@ -33,6 +33,7 @@ def define_series(lst):
         return series.constant
     elif len(set(lst)) <= len(lst) / 2: # At least have the data points are duplicates
         return series.repetitive
+    return series.unknown
 
 class QueryData(object):
     def __init__(self):
@@ -82,16 +83,16 @@ class WebRoot(Controller):
             cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
             cursor = cnx.cursor()
 
-            cursor.execute(get_queries_db, (exp_id, datetime.utcnow - timedelta(day=1)))
+            cursor.execute(get_queries_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
             for src_ip, src_port, query, trans_id, ip_id, isopen in cursor:
                 data['rdns'][src_ip].insert(src_port, query, trans_id, ip_id, isopen)
 
             for src_ip in data['rdns']:
                 data['rdns'][src_ip] = data['rdns'][src_ip].compute()
 
-            cursor.execute(get_fdns_db, (exp_id, datetime.utcnow - timedelta(day=1)))
+            cursor.execute(get_fdns_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
             for src_ip, isopen, preplay in cursor:
-                data['fdns'] = {'ip':src_ip, 'open':bool(isopen), 'preplay':status[preplay]}
+                data['fdns'] = {'ip':src_ip, 'open':isopen == status.open, 'preplay_vuln':bool(preplay)}
 
             cursor.close()
         except Exception as e:
@@ -99,7 +100,7 @@ class WebRoot(Controller):
         finally:
             if cnx:
                 cnx.close()
-        return json_dump(data)
+        return json_dump(data, sort_keys=True, indent=4, separators=(',', ': '))
 
     def scan(self, exp_id=None, ip=None):
         if not exp_id:
@@ -204,7 +205,7 @@ if __name__ == "__main__":
     # set up command line args
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,\
                                      description='A simple web server implementation for experiment')
-    parser.add_argument('-a', '--address', default='127.0.0.1:8053', help='Address to bind upon')                                     
+    parser.add_argument('-a', '--address', default='0.0.0.0:8053', help='Address to bind upon')
     parser.add_argument('-u', '--username', default='root')
     parser.add_argument('-p', '--password', default=None)
     parser.add_argument('-q', '--quiet', action='store_true', default=False, help='only print errors')
