@@ -101,6 +101,7 @@ class AServer(RawUdpServer):
     def check_resolver(self, data):
         self.resolvers[data.src_ip].append(data)
         if len(self.resolvers[data.src_ip]) < 4:
+            logging.info('Testing if %s is an open resolver', data.src_ip)
             query = dl.DNSRecord.question("google.com") # Arbitrary domain name
             self.write((data.src_ip, 53), query.pack())
 
@@ -168,6 +169,8 @@ class DatabaseInserter(Thread):
             self.wait_item(data[-1])
             # Convert to database format
             data = [i.insert_tuple() for i in data]
+            
+            logging.info('Performing database insert of %s', data)
             
             cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
             try:
