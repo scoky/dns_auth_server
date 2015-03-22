@@ -23,6 +23,17 @@ TABLES['queries'] = (
     "  PRIMARY KEY (`qid`)"
     ") ENGINE=InnoDB")
     
+TABLES['fdns'] = (
+    "CREATE TABLE `fdns` ("
+    "  `fid` int(11) NOT NULL AUTO_INCREMENT,"
+    "  `exp_id` varchar(10) NOT NULL,"
+    "  `src_ip` varchar(15) NOT NULL,"
+    "  `open` tinyint NOT NULL,"
+    "  `preplay` tinyint NOT NULL,"
+    "  `time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+    "  PRIMARY KEY (`fid`)"
+    ") ENGINE=InnoDB")
+    
 def create_database(cursor):
     try:
         cursor.execute(

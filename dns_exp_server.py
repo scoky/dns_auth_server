@@ -54,7 +54,7 @@ class AServer(RawUdpServer):
         
         logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, str(qname), qclass, qtype)
 
-        if response.header.rcode == 0 and response.header.a > 0 and addr[0] in self.resolvers:
+        if response.header.rcode == dl.RCODE.NOERROR and response.header.a > 0 and addr[0] in self.resolvers:
             for data in self.resolvers[addr[0]]:
                 data.open = True
             del self.resolvers[addr[0]]
@@ -68,7 +68,7 @@ class AServer(RawUdpServer):
         
         logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, str(qname), qclass, qtype)
 
-        reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=1), q=request.q)        
+        reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=1), q=request.q)
         
         # Lookup to see if this name is in records
         key = qnm+qclass+qtype

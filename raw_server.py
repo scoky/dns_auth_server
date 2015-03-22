@@ -40,7 +40,7 @@ class RawUdpServer(object):
         pass
         
     def terminate(self):
-        logging.info('RawUdpServer terminating')
+        #logging.info('RawUdpServer terminating')
         self.running = False
         # Wait for run to return?
         self.sock.close()
@@ -52,7 +52,7 @@ class RawUdpServer(object):
         #ipdata = dpkt.ip.IP(src = self.addr, dst = socket.inet_aton(daddr[0]), data = udpdata)
         self.sock.sendto(str(udpdata), daddr)
         
-    def writeto(self, daddr, saddr, data):
+    def writefrom(self, daddr, saddr, data):
         udpdata = dpkt.udp.UDP(sport = saddr[1], dport = daddr[1], data = data)
         udpdata.ulen = len(udpdata)
         # Cannot generate own IP header (i.e., no spoofing?)
