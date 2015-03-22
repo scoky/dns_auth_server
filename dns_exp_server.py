@@ -99,11 +99,16 @@ class AServer(RawUdpServer):
         self.write(addr, reply.pack())
         
     def check_resolver(self, data):
-        self.resolvers[data.src_ip].append(data)
-        if len(self.resolvers[data.src_ip]) < 4:
+        lst = self.resolvers[data.src_ip]
+        lst.append(data)
+        # Limit the number of probes that we send
+        if len(lst) <= 2:
             logging.info('Testing if %s is an open resolver', data.src_ip)
             query = dl.DNSRecord.question("google.com") # Arbitrary domain name
-            self.write((data.src_ip, 53), query.pack())
+            self.write((data.src_ip, 53), query.pack()) 
+        # Insure lists do not grow too large
+        while len(lst) > 0 and lst[0].time < datetime.utcnow():
+            del lst[0]
 
     def refresh_records(self):        
         records = {}
@@ -133,7 +138,7 @@ class QueryData(object):
         self.trans_id = trans_id
         self.ip_id = ip_id
         self.open = False
-        self.time = datetime.utcnow() + timedelta(seconds=1)
+        self.time = datetime.utcnow() + timedelta(seconds=2)
         
     def insert_tuple(self):
         return (self.exp_id, self.src_ip, self.src_port, self.query, self.trans_id, self.ip_id, int(self.open))
