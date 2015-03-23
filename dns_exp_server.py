@@ -83,7 +83,7 @@ class AServer(RawUdpServer):
                 addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=60)) # A negligable TTL
         elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
             # Validate the query
-            prased = parseQueryString(qnm)
+            parsed = parseQueryString(qnm)
             exp_id = parsed['exp_id']
             step = parsed['step']
             if exp_id and step:
