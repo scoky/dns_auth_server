@@ -1,18 +1,18 @@
 #!/usr/bin/python
 
-import sys
 import os
+import sys
+import time
+import Queue
 import logging
 import argparse
 import traceback
-import mysql.connector
 import dnslib as dl
+import mysql.connector
+from threading import Thread,Timer
+from raw_server import RawUdpServer
 from collections import defaultdict
 from datetime import datetime,timedelta
-from raw_server import RawUdpServer
-from threading import Thread,Timer
-import Queue
-import time
 
 def parseQueryString(qnm):
     tokens = qnm.split('.')
@@ -83,8 +83,10 @@ class AServer(RawUdpServer):
                 addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=60)) # A negligable TTL
         elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
             # Validate the query
-            exp_id = parseQueryString(qnm)['exp_id']
-            if exp_id:
+            prased = parseQueryString(qnm)
+            exp_id = parsed['exp_id']
+            step = parsed['step']
+            if exp_id and step:
                 data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
                 self.inserter.addItem(data)
                 self.check_resolver(data)

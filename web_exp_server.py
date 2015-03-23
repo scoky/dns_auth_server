@@ -76,6 +76,8 @@ class WebRoot(Controller):
         if not exp_id:
             return ''
 
+        logging.info('Result request for %s', exp_id)
+
         data = { }
         data['rdns'] = defaultdict(QueryData)
         cnx = None
@@ -108,18 +110,20 @@ class WebRoot(Controller):
         if not ip:
             ip = self.request.remote.ip
         
+        start = datetime.utcnow()
+        logging.info('Scan request for %s, %s', exp_id, ip)
+        
         # Create a UDP socket to use in the experiment
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.bind(('0.0.0.0', 0))
-        
         # Test if the remote IP address is an open resolver
         isopen = testOpenResolver(ip, sock)
         if isopen == status.open:
             vulnerable = testPreplay(exp_id, ip, sock)
         else:
             vulnerable = False
-            # Expend the time that would have otherwise been used to test for preplay
-            time.sleep(2.0)
+        # Cleanup
+        sock.close()
             
         cnx = None
         try:
@@ -133,20 +137,23 @@ class WebRoot(Controller):
         finally:
             if cnx:
                 cnx.close()
-            
-        sock.close()
+
+        # Insure that the scan takes at least 5 seconds to allow enough time for the client to send many DNS requests
+        remaining = timedelta(seconds=5) - (datetime.utcnow() - start)
+        if remaining > datetime.timedelta(0):
+            time.sleep(float(str(remaining.seconds)+'.'+str(remaining.microseconds)))
         return 'DONE'
         
         
 def testOpenResolver(ip, sock):
     try:
         # Try 2 times
-        for step in range(2):
+        for step in range(3):
             query = dl.DNSRecord.question("google.com") # Arbitrary domain name
             sock.sendto(query.pack(), (ip, 53))
             time.sleep(0.001)
 
-        sock.settimeout(2.0)
+        sock.settimeout(3.0)
         data, saddr = sock.recvfrom(4096)
         if saddr[0] == ip:
             ans = dl.DNSRecord.parse(data)
@@ -164,7 +171,7 @@ def testPreplay(exp_id, ip, sock):
     raw_sock = RawUdpServer(('0.0.0.0', 53))
     try:
         # Try 2 times
-        for step in range(2):
+        for step in range(3):
             qname = "exp_id-%s.preplay-%s.dnstool.exp.schomp.info" % (exp_id, step)
             adata = '.'.join(map(str, [random.randint(0,255) for i in range(4)]))
             
@@ -185,7 +192,7 @@ def testPreplay(exp_id, ip, sock):
             sock.sendto(query.pack(), (ip, 53))
             
             # Receive an answer from the fdns
-            sock.settimeout(2.0)
+            sock.settimeout(3.0)
             # Expecting no more than 2 packets
             while True:
                 try:
