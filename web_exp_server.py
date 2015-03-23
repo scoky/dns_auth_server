@@ -104,6 +104,12 @@ class WebRoot(Controller):
         finally:
             if cnx:
                 cnx.close()
+
+        # Report back whether this is a complete experiment
+        if 'fdns' in data and 'rdns' in data and len(data['rdns']) > 0:
+            data['success'] = True
+        else:
+            data['success'] = False
         return json_dump(data, sort_keys=True, indent=4, separators=(',', ': '))
 
     def scan(self, exp_id=None, ip=None):
