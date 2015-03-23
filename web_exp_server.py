@@ -37,13 +37,15 @@ def define_series(lst):
 
 class QueryData(object):
     def __init__(self):
+        self.src_ip = None
         self.ports = []
         self.queries = []
         self.trans_ids = []
         self.ip_ids = []
         self.open = False
 
-    def insert(self, src_port, query, trans_id, ip_id, isopen):
+    def insert(self, src_ip, src_port, query, trans_id, ip_id, isopen):
+        self.src_ip = src_ip
         self.ports.append(src_port)
         self.queries.append(query)
         self.trans_ids.append(trans_id)
@@ -57,7 +59,8 @@ class QueryData(object):
         return ret
 
     def compute(self):
-        return { 'port_seq' : series[define_series(self.ports)],\
+        return { 'ip' : self.src_ip,\
+                 'port_seq' : series[define_series(self.ports)],\
                  '0x20_encode' : self.is_0x20(),\
                  'transid_seq' : series[define_series(self.trans_ids)],\
                  'ipid_seq' : series[define_series(self.ip_ids)],\
@@ -87,11 +90,10 @@ class WebRoot(Controller):
 
             cursor.execute(get_queries_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
             for src_ip, src_port, query, trans_id, ip_id, isopen in cursor:
-                data['rdns'][src_ip].insert(src_port, query, trans_id, ip_id, isopen)
+                data['rdns'][src_ip].insert(src_ip, src_port, query, trans_id, ip_id, isopen)
 
-            for src_ip in data['rdns']:
-                data['rdns'][src_ip] = data['rdns'][src_ip].compute()
-
+            data['rdns'] = [v.compute() for v in data['rdns'].values()]
+            
             cursor.execute(get_fdns_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
             for src_ip, isopen, preplay in cursor:
                 data['fdns'] = {'ip':src_ip, 'open':isopen == status.open, 'preplay_vuln':bool(preplay)}
