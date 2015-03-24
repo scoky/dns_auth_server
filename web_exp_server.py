@@ -21,17 +21,14 @@ series = dl.Bimap('series', {0:'unknown', 1:'incremental', 2:'decremental', 3:'r
 
 # Heuristics for determining series type
 def define_series(lst):
-    # Too few data points
-    if len(lst) <= 5:
-        return series.unknown
     # Sorted in increasing order
-    elif all(lst[i] <= lst[i+1] for i in xrange(len(lst)-1)):
+    elif len(lst) >= 5 and all(lst[i] <= lst[i+1] for i in xrange(len(lst)-1)):
         return series.incremental
-    elif all(lst[i] >= lst[i+1] for i in xrange(len(lst)-1)):
+    elif len(lst) >= 5 and all(lst[i] >= lst[i+1] for i in xrange(len(lst)-1)):
         return series.decremental
-    elif len(set(lst)) == 1:
+    elif len(lst) >= 3 and len(set(lst)) == 1:
         return series.constant
-    elif len(set(lst)) <= len(lst) / 2: # At least have the data points are duplicates
+    elif len(lst) >= 4 and len(set(lst)) <= len(lst) / 2: # At least half the data points are duplicates
         return series.repetitive
     return series.unknown
 
