@@ -22,7 +22,7 @@ series = dl.Bimap('series', {0:'unknown', 1:'incremental', 2:'decremental', 3:'r
 # Heuristics for determining series type
 def define_series(lst):
     # Sorted in increasing order
-    elif len(lst) >= 5 and all(lst[i] <= lst[i+1] for i in xrange(len(lst)-1)):
+    if len(lst) >= 5 and all(lst[i] <= lst[i+1] for i in xrange(len(lst)-1)):
         return series.incremental
     elif len(lst) >= 5 and all(lst[i] >= lst[i+1] for i in xrange(len(lst)-1)):
         return series.decremental
