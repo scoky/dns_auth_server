@@ -60,7 +60,7 @@ class QueryData(object):
     def get_times(self):
         if len(self.tx_times) > 0:
             return [(t-self.tx_times[0]).total_seconds() for t in self.tx_times]
-        else
+        else:
             return []
 
     def compute(self):
