@@ -86,7 +86,7 @@ class AServer(RawUdpServer):
             parsed = parseQueryString(qnm)
             exp_id = parsed['exp_id']
             step = parsed['step']
-            if exp_id and step and !parsed['cname']:
+            if exp_id and step and not parsed['cname']:
                 data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
                 self.inserter.addItem(data)
                 self.check_resolver(data)
@@ -193,7 +193,7 @@ class DatabaseInserter(Thread):
             # Convert to database format
             data = [i.insert_tuple() for i in data]
             
-            logging.info('Performing database insert of %s', data)
+            #logging.info('Performing database insert of %s', data)
             
             cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
             try:

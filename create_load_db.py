@@ -19,7 +19,7 @@ TABLES['queries'] = (
     "  `trans_id` int NOT NULL,"
     "  `ip_id` int NOT NULL,"
     "  `open` tinyint NOT NULL,"
-    "  `time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+    "  `time` TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),"
     "  PRIMARY KEY (`qid`)"
     ") ENGINE=InnoDB")
     

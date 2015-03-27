@@ -40,14 +40,16 @@ class QueryData(object):
         self.trans_ids = []
         self.ip_ids = []
         self.open = False
+        self.tx_times = []
 
-    def insert(self, src_ip, src_port, query, trans_id, ip_id, isopen):
+    def insert(self, src_ip, src_port, query, trans_id, ip_id, isopen, txtime):
         self.src_ip = src_ip
         self.ports.append(src_port)
         self.queries.append(query)
         self.trans_ids.append(trans_id)
         self.ip_ids.append(ip_id)
         self.open |= isopen
+        self.tx_times.append(txtime)
 
     def is_0x20(self):
         ret = False
@@ -64,9 +66,10 @@ class QueryData(object):
                  'transids' : self.trans_ids,\
                  'ipid_seq' : series[define_series(self.ip_ids)],\
                  'ipids' : self.ip_ids,\
-                 'open' : bool(self.open) }
+                 'open' : bool(self.open),\
+                 'txtimes' : self.tx_times }
 
-get_queries_db = ("SELECT src_ip, src_port, query, trans_id, ip_id, open "
+get_queries_db = ("SELECT src_ip, src_port, query, trans_id, ip_id, open, time "
                "FROM queries WHERE exp_id = %s AND time > %s ORDER BY qid ")
 get_fdns_db = ("SELECT src_ip, open, preplay "
                "FROM fdns WHERE exp_id = %s AND time > %s ")
@@ -89,8 +92,8 @@ class WebRoot(Controller):
             cursor = cnx.cursor()
 
             cursor.execute(get_queries_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
-            for src_ip, src_port, query, trans_id, ip_id, isopen in cursor:
-                data['rdns'][src_ip].insert(src_ip, src_port, query, trans_id, ip_id, isopen)
+            for src_ip, src_port, query, trans_id, ip_id, isopen, txtime in cursor:
+                data['rdns'][src_ip].insert(src_ip, src_port, query, trans_id, ip_id, isopen, txtime)
 
             data['rdns'] = [v.compute() for v in data['rdns'].values()]
             
