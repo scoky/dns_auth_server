@@ -56,6 +56,12 @@ class QueryData(object):
         for r in (q != q.lower() for q in self.queries):
             ret |= r
         return ret
+        
+    def get_times(self):
+        if len(self.tx_times) > 0:
+            return [(t-self.tx_times[0]).total_seconds() for t in self.tx_times]
+        else
+            return []
 
     def compute(self):
         return { 'ip' : self.src_ip,\
@@ -67,7 +73,7 @@ class QueryData(object):
                  'ipid_seq' : series[define_series(self.ip_ids)],\
                  'ipids' : self.ip_ids,\
                  'open' : bool(self.open),\
-                 'txtimes' : self.tx_times }
+                 'txtimes' : self.get_times() }
 
 get_queries_db = ("SELECT src_ip, src_port, query, trans_id, ip_id, open, time "
                "FROM queries WHERE exp_id = %s AND time > %s ORDER BY qid ")
