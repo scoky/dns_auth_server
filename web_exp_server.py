@@ -58,9 +58,12 @@ class QueryData(object):
     def compute(self):
         return { 'ip' : self.src_ip,\
                  'port_seq' : series[define_series(self.ports)],\
+                 'ports' : self.ports,\
                  '0x20_encode' : self.is_0x20(),\
                  'transid_seq' : series[define_series(self.trans_ids)],\
+                 'transids' : self.trans_ids,\
                  'ipid_seq' : series[define_series(self.ip_ids)],\
+                 'ipids' : self.ip_ids,\
                  'open' : bool(self.open) }
 
 get_queries_db = ("SELECT src_ip, src_port, query, trans_id, ip_id, open "

@@ -86,14 +86,28 @@ class AServer(RawUdpServer):
             parsed = parseQueryString(qnm)
             exp_id = parsed['exp_id']
             step = parsed['step']
-            if exp_id and step:
+            if exp_id and step and !parsed['cname']:
                 data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
                 self.inserter.addItem(data)
                 self.check_resolver(data)
                 
-            # Return a cname to the website
-            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
-                rdata=dl.CNAME("schomp.info"), ttl=60))
+                # Return a cname from another random record
+                reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
+                    rdata=dl.CNAME("exp_id-%s.step-%s.cname.dnstool.exp.schomp.info" % (exp_id, step)), ttl=60))
+
+            elif exp_id and step and parsed['cname']:
+                data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
+                self.inserter.addItem(data)
+                self.check_resolver(data)
+
+                # Return a cname to the website
+                reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
+                    rdata=dl.CNAME("schomp.info"), ttl=60))
+            else:
+                # Return a cname to the website
+                reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
+                    rdata=dl.CNAME("schomp.info"), ttl=60))
+
         # TODO: Add other tools HERE!
         else:
             # Error
@@ -142,7 +156,7 @@ class QueryData(object):
         self.ip_id = ip_id
         self.open = False
         self.dbtime = datetime.utcnow()
-        self.time = datetime.utcnow() + timedelta(seconds=2)
+        self.time = datetime.utcnow() + timedelta(seconds=1)
         
     def insert_tuple(self):
         return (self.exp_id, self.src_ip, self.src_port, self.query, self.trans_id, self.ip_id, int(self.open), self.dbtime)
