@@ -34,6 +34,10 @@ TABLES['fdns'] = (
     "  PRIMARY KEY (`fid`)"
     ") ENGINE=InnoDB")
     
+INDICES = {}
+INDICES['in_queries_exp_id'] = ("CREATE INDEX `in_queries_exp_id` ON queries (exp_id)")
+INDICES['in_fdns_exp_id'] = ("CREATE INDEX `in_fdns_exp_id` ON fdns (exp_id)")
+    
 def create_database(cursor):
     try:
         cursor.execute(
@@ -66,6 +70,18 @@ if __name__ == "__main__":
     for name, ddl in TABLES.iteritems():
         try:
             print("Creating table {}: ".format(name), end='')
+            cursor.execute(ddl)
+        except mysql.connector.Error as err:
+            if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
+                print("already exists.")
+            else:
+                print(err.msg)
+        else:
+            print("OK")
+
+    for name, ddl in INDICES.iteritems():
+        try:
+            print("Creating index {}: ".format(name), end='')
             cursor.execute(ddl)
         except mysql.connector.Error as err:
             if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
