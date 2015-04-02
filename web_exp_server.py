@@ -19,18 +19,26 @@ import time
 status = dl.Bimap('status', {0:'closed', 1:'refused', 2:'open'})
 series = dl.Bimap('series', {0:'unknown', 1:'incremental', 2:'decremental', 3:'repetitive', 4:'constant'})
 
+SAMPLE_THRESHOLD=5
 # Heuristics for determining series type
 def define_series(lst):
     # Sorted in increasing order
-    if len(lst) >= 5 and all(lst[i] <= lst[i+1] for i in xrange(len(lst)-1)):
+    if len(lst) >= SAMPLE_THRESHOLD and all(lst[i] <= lst[i+1] for i in xrange(len(lst)-1)): # All values increment
         return series.incremental
-    elif len(lst) >= 5 and all(lst[i] >= lst[i+1] for i in xrange(len(lst)-1)):
+    elif len(lst) >= SAMPLE_THRESHOLD and all(lst[i] >= lst[i+1] for i in xrange(len(lst)-1)): # All values decrement
         return series.decremental
-    elif len(lst) >= 3 and len(set(lst)) == 1:
+    elif len(lst) >= SAMPLE_THRESHOLD and len(set(lst)) == 1:
         return series.constant
-    elif len(lst) >= 4 and len(set(lst)) <= len(lst) / 2: # At least half the data points are duplicates
+    elif len(lst) >= SAMPLE_THRESHOLD and len(set(lst)) <= len(lst) / 2: # At least half the data points are duplicates
         return series.repetitive
+    elif any(all(0 <= s[i+1] - s[i] < 1000 for i in xrange(len(s)-1)) for s in sublists(lst, SAMPLE_THRESHOLD)): # Sequence of incrementing values
+        return series.incremental
+    elif any(all(0 <= s[i] - s[i+1] < 1000 for i in xrange(len(s)-1)) for s in sublists(lst, SAMPLE_THRESHOLD)): # Sequence of decrementing values
+        return series.decremental
     return series.unknown
+    
+def sublists(lst, n):
+    return (lst[i:i+n] for i in range(len(lst) - n + 1))
 
 class QueryData(object):
     def __init__(self):
