@@ -148,7 +148,7 @@ add_query_db = ("INSERT INTO queries "
                
 class QueryData(object):
     def __init__(self, exp_id, src_ip, src_port, query, trans_id, ip_id):
-        self.exp_id = exp_id
+        self.exp_id = exp_id.lower()
         self.src_ip = src_ip
         self.src_port = src_port
         self.query = query
