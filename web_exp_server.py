@@ -109,7 +109,7 @@ class WebRoot(Controller):
             for src_ip, src_port, query, trans_id, ip_id, isopen, txtime in cursor:
                 data['rdns'][src_ip].insert(src_ip, src_port, query, trans_id, ip_id, isopen, txtime)
 
-            data['rdns'] = [v.compute() for v in data['rdns'].values()]
+            data['rdns'] = [v.compute() for v in sorted(data['rdns'].values(), key = lambda va: va.src_ip)]
             
             cursor.execute(get_fdns_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
             for src_ip, isopen, preplay in cursor:
