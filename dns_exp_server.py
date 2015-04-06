@@ -100,9 +100,11 @@ class AServer(RawUdpServer):
                 self.inserter.addItem(data)
                 self.check_resolver(data)
 
+                # Return NXDOMAIN to stop the webpage fetch
+                reply.header.rcode = dl.RCODE.NXDOMAIN
                 # Return a cname to the website
-                reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
-                    rdata=dl.CNAME("schomp.info"), ttl=60))
+                #reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
+                #    rdata=dl.CNAME("schomp.info"), ttl=60))
             else:
                 # Return a cname to the website
                 reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
