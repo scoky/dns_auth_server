@@ -120,7 +120,7 @@ class WebRoot(Controller):
         timings = json_load(data)
         data = []
         for timing in data:
-            data.append((timing['time'], exp_id, timing['query']))
+            data.append( (int(round(float(timing['time']))), exp_id, timing['query']) )
 
         cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
         try:
