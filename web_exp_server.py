@@ -98,7 +98,7 @@ class WebRoot(Controller):
         if not ip:
             ip = self.request.remote.ip
             
-        logging.info('Timing post for %s, %s data: %s', exp_id, ip, self.request.body)
+        logging.info('Timing post for %s, %s data: %s', exp_id, ip, self.request.body.decode("utf-8"))
         return 'DONE'
 
     def result(self, exp_id=None):
