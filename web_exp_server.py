@@ -105,7 +105,7 @@ get_fdns_db = ("SELECT src_ip, open, preplay "
 add_fdns_db = ("INSERT INTO fdns "
                "(exp_id, src_ip, open, preplay) "
                "VALUES (%s, %s, %s, %s)")
-add_timing_db = ("UPDATE queries SET resolution = %s WHERE exp_id = %s AND query = '%s'")
+add_timing_db = ("UPDATE queries SET resolution = %s WHERE exp_id = %s AND query = %s")
 
 class WebRoot(Controller):
     def timing(self, exp_id=None, ip=None):
@@ -119,7 +119,7 @@ class WebRoot(Controller):
 
         timings = json_load(data)
         data = []
-        for timing in data:
+        for timing in timings:
             data.append( (int(round(float(timing['time']))), exp_id, timing['query']) )
 
         cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
