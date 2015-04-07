@@ -92,6 +92,15 @@ add_fdns_db = ("INSERT INTO fdns "
                "VALUES (%s, %s, %s, %s)")
 
 class WebRoot(Controller):
+    def timing(self, exp_id=None, ip=None, data=None):
+        if not exp_id:
+            return 'FAIL'
+        if not ip:
+            ip = self.request.remote.ip
+            
+        logging.info('Timing post for %s, %s data: %s', exp_id, ip, data)
+        return 'DONE'
+
     def result(self, exp_id=None):
         if not exp_id:
             return ''
