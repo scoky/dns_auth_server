@@ -9,7 +9,7 @@ import mysql.connector
 import dnslib as dl
 from collections import defaultdict
 from datetime import datetime,timedelta
-from json import dumps as json_dump
+from json import dumps as json_dump, loads as json_load
 from circuits.web import Server, Controller
 from raw_server import RawUdpServer
 import socket
@@ -97,8 +97,11 @@ class WebRoot(Controller):
             return 'FAIL'
         if not ip:
             ip = self.request.remote.ip
-            
-        logging.info('Timing post for %s, %s data: %s', exp_id, ip, self.request.body.decode("utf-8"))
+
+        data = ' '.join(self.request.body.readlines())
+        logging.info('Timing post for %s, %s data: %s', exp_id, ip, data)
+
+        data = json_load(data)
         return 'DONE'
 
     def result(self, exp_id=None):
