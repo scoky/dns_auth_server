@@ -39,6 +39,24 @@ def define_series(lst):
     
 def sublists(lst, n):
     return (lst[i:i+n] for i in range(len(lst) - n + 1))
+    
+class TimingData(object):
+    def __init__(self):
+        self.timings = []
+        self.collect = {}
+        
+    def insert(self, query, txtime, resolution):
+        if resolution:
+            self.collect[query] = (txtime, resolution)
+        else:
+            query = query.replace('cname.', '')
+            if query in self.collect:
+                delta = self.collect[query][1] - ((txtime - self.collect[query][0]).total_seconds() * 1000 * 2) # Convert to ms, times 2 RTT
+                self.timings.append(max(0, int(delta)))
+
+    def compute(self):
+        return { 'rdns_rtt': (0 if len(self.timings) == 0 else sum(self.timings)/len(self.timings)) }
+
 
 class QueryData(object):
     def __init__(self):
@@ -66,10 +84,7 @@ class QueryData(object):
         return ret
         
     def get_times(self):
-        if len(self.tx_times) > 0:
-            return [(t-self.tx_times[0]).total_seconds() for t in self.tx_times]
-        else:
-            return []
+        return [(t-self.tx_times[0]).total_seconds() for t in self.tx_times]
 
     def compute(self):
         return { 'ip' : self.src_ip,\
@@ -83,13 +98,14 @@ class QueryData(object):
                  'open' : bool(self.open),\
                  'txtimes' : self.get_times() }
 
-get_queries_db = ("SELECT src_ip, src_port, query, trans_id, ip_id, open, time "
+get_queries_db = ("SELECT src_ip, src_port, query, trans_id, ip_id, open, time, resolution "
                "FROM queries WHERE exp_id = %s AND time > %s ORDER BY qid ")
 get_fdns_db = ("SELECT src_ip, open, preplay "
                "FROM fdns WHERE exp_id = %s AND time > %s ")
 add_fdns_db = ("INSERT INTO fdns "
                "(exp_id, src_ip, open, preplay) "
                "VALUES (%s, %s, %s, %s)")
+add_timing_db = ("UPDATE queries SET resolution = %s WHERE exp_id = %s AND query = %s")
 
 class WebRoot(Controller):
     def timing(self, exp_id=None, ip=None):
@@ -101,7 +117,22 @@ class WebRoot(Controller):
         data = ' '.join(self.request.body.readlines())
         logging.info('Timing post for %s, %s data: %s', exp_id, ip, data)
 
-        data = json_load(data)
+        timings = json_load(data)
+        data = []
+        for timing in data:
+            data.append((timing['time'], exp_id, timing['query']))
+
+        cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
+        try:
+            cursor = cnx.cursor()
+            cursor.executemany(add_timing_db, data)
+            cnx.commit()
+            cursor.close()
+        except Exception as e:
+            logging.error('Error on database: %s\n%s', e, traceback.format_exc())
+        finally:
+            cnx.close()
+
         return 'DONE'
 
     def result(self, exp_id=None):
@@ -110,6 +141,7 @@ class WebRoot(Controller):
 
         logging.info('Result request for %s', exp_id)
 
+        timing = TimingData()
         data = { }
         data['rdns'] = defaultdict(QueryData)
         cnx = None
@@ -118,10 +150,12 @@ class WebRoot(Controller):
             cursor = cnx.cursor()
 
             cursor.execute(get_queries_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
-            for src_ip, src_port, query, trans_id, ip_id, isopen, txtime in cursor:
+            for src_ip, src_port, query, trans_id, ip_id, isopen, txtime, resolution in cursor:
                 data['rdns'][src_ip].insert(src_ip, src_port, query, trans_id, ip_id, isopen, txtime)
+                timing.insert(query, txtime, resolution)                        
 
             data['rdns'] = [v.compute() for v in sorted(data['rdns'].values(), key = lambda va: va.src_ip)]
+            data['timing'] = timing.compute()
             
             cursor.execute(get_fdns_db, (exp_id, datetime.utcnow() - timedelta(days=1)))
             for src_ip, isopen, preplay in cursor:

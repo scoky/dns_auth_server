@@ -20,6 +20,7 @@ TABLES['queries'] = (
     "  `ip_id` int NOT NULL,"
     "  `open` tinyint NOT NULL,"
     "  `time` TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),"
+    "  `resolution` int,"
     "  PRIMARY KEY (`qid`)"
     ") ENGINE=InnoDB")
     
