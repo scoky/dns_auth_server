@@ -23,14 +23,14 @@ SAMPLE_THRESHOLD=5
 # Heuristics for determining series type
 def define_series(lst):
     # Sorted in increasing order
-    if len(lst) >= SAMPLE_THRESHOLD and all(lst[i] <= lst[i+1] for i in xrange(len(lst)-1)): # All values increment
-        return series.incremental
-    elif len(lst) >= SAMPLE_THRESHOLD and all(lst[i] >= lst[i+1] for i in xrange(len(lst)-1)): # All values decrement
-        return series.decremental
-    elif len(lst) >= SAMPLE_THRESHOLD and len(set(lst)) == 1:
+    if len(lst) >= SAMPLE_THRESHOLD and len(set(lst)) == 1:
         return series.constant
     elif len(lst) >= SAMPLE_THRESHOLD and len(set(lst)) <= len(lst) / 2: # At least half the data points are duplicates
         return series.repetitive
+    elif len(lst) >= SAMPLE_THRESHOLD and all(lst[i] < lst[i+1] for i in xrange(len(lst)-1)): # All values increment
+        return series.incremental
+    elif len(lst) >= SAMPLE_THRESHOLD and all(lst[i] > lst[i+1] for i in xrange(len(lst)-1)): # All values decrement
+        return series.decremental
     elif any(all(0 <= s[i+1] - s[i] < 1000 for i in xrange(len(s)-1)) for s in sublists(lst, SAMPLE_THRESHOLD)): # Sequence of incrementing values
         return series.incremental
     elif any(all(0 <= s[i] - s[i+1] < 1000 for i in xrange(len(s)-1)) for s in sublists(lst, SAMPLE_THRESHOLD)): # Sequence of decrementing values
@@ -115,7 +115,7 @@ class WebRoot(Controller):
             ip = self.request.remote.ip
 
         data = ' '.join(self.request.body.readlines())
-        logging.info('Timing post for %s, %s data: %s', exp_id, ip, data)
+        logging.info('Timing post for %s, %s', exp_id, ip)
 
         timings = json_load(data)
         data = []
