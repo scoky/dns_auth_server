@@ -1,3 +1,5 @@
 # This is a comment
 # qname qclass qtype ttl ans
+exp.schomp.info         IN      NS      3600    ns1.schomp.info
+exp.schomp.info         IN      CNAME   3600    schomp.info
 test.exp.schomp.info.   IN      A       3600    1.1.1.1
