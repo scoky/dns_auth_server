@@ -73,7 +73,7 @@ class AServer(RawUdpServer):
         # Lookup to see if this name is in records
         key = qnm+qclass+qtype
         if key in self.records:
-            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
+            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=self.records[key].rtype,\
                 rdata=self.records[key].rdata, ttl=self.records[key].ttl))
         elif not qnm.endswith('exp.schomp.info.'):
             reply.header.rcode = dl.RCODE.REFUSED
