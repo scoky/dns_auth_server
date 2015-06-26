@@ -139,6 +139,9 @@ class AServer(RawUdpServer):
                     qname,qclass,qtype,ttl,ans = line.split()
                     records[qname.lower()+qclass+qtype] = dl.RR(qname, rclass=dl.CLASS.reverse[qclass],\
                         rtype=dl.QTYPE.reverse[qtype], rdata=getattr(dl, qtype)(ans), ttl=int(ttl))
+                    if dl.QTYPE.reverse[qtype] == dl.QTYPE.CNAME:
+                        records[qname.lower()+qclass+'A'] = dl.RR(qname, rclass=dl.CLASS.reverse[qclass],\
+                            rtype=dl.QTYPE.reverse[qtype], rdata=getattr(dl, qtype)(ans), ttl=int(ttl))
             except Exception as e:
                logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
         self.records = records
