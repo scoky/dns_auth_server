@@ -54,8 +54,25 @@ class TimingData(object):
                 delta = self.collect[query][1] - ((txtime - self.collect[query][0]).total_seconds() * 1000 * 2) # Convert to ms, times 2 RTT
                 self.timings.append(max(0, int(delta)))
 
+    def ptile_from_rtt(self, rtt):
+        rtt = rtt - 25 # Offset estimate of the local cost of resolution with javascript
+        if rtt > 200:
+            return 'bottom 10%'
+        elif rtt > 110:
+            return 'bottom 10-20%'
+        elif rtt > 70:
+            return 'bottom 20-30%'
+        elif rtt > 30:
+            return 'bottom 30-40%'
+        elif rtt > 10:
+            return 'bottom 40-50%'
+        else:
+            return 'top 50%'
+
     def compute(self):
-        return { 'rdns_rtt': (0 if len(self.timings) == 0 else sum(self.timings)/len(self.timings)) }
+        rtt = 0 if len(self.timings) == 0 else sum(self.timings)/len(self.timings)
+        return { 'rdns_rtt': rtt,\
+                 'rdns_rtt_ptile': self.ptile_from_rtt(rtt) }
 
 
 class QueryData(object):
