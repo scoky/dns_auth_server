@@ -73,7 +73,7 @@ class AServer(RawUdpServer):
         # Lookup to see if this name is in records
         key = qnm+qclass+qtype
         if key in self.records:
-            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=self.records[key].rtype,\
+            reply.add_answer(dl.RR(qname, rclass=self.records[key].rclass, rtype=self.records[key].rtype,\
                 rdata=self.records[key].rdata, ttl=self.records[key].ttl))
         elif not qnm.endswith('exp.schomp.info.'):
             reply.header.rcode = dl.RCODE.REFUSED
@@ -87,7 +87,7 @@ class AServer(RawUdpServer):
 
         # Nameserver or website address
         elif request.q.qtype == dl.QTYPE.A and (qnm == 'ns1.exp.schomp.info.' or qnm == 'exp.schomp.info.'):
-            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
+            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
                 rdata=dl.A(args.external), ttl=3600))
 
         # Recursion test
@@ -99,7 +99,7 @@ class AServer(RawUdpServer):
 
         # TXT record request
         elif request.q.qtype == dl.QTYPE.TXT:
-            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
+            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.TXT,\
                 rdata=dl.TXT(("RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
                 addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=60)) # A negligable TTL
 
@@ -115,7 +115,7 @@ class AServer(RawUdpServer):
                 self.check_resolver(data)
                 
                 # Return a cname from another random record
-                reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
+                reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.CNAME,\
                     rdata=dl.CNAME("exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)), ttl=60))
 
             elif exp_id and step and parsed['cname']:
@@ -125,13 +125,10 @@ class AServer(RawUdpServer):
 
                 # Return NXDOMAIN to stop the webpage fetch
                 reply.header.rcode = dl.RCODE.NXDOMAIN
-                # Return a cname to the website
-                #reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
-                #    rdata=dl.CNAME("schomp.info"), ttl=60))
             else:
-                # Return a cname to the website
-                reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
-                    rdata=dl.CNAME("schomp.info"), ttl=60))
+                # Return the website
+                reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
+                    rdata=dl.A(args.external), ttl=60))
 
         # TODO: Add other tools HERE!
         else:
