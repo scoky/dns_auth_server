@@ -68,7 +68,7 @@ class AServer(RawUdpServer):
         
         logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, str(qname), qclass, qtype)
 
-        reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=1), q=request.q)
+        reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=0), q=request.q)
         
         # Lookup to see if this name is in records
         key = qnm+qclass+qtype
@@ -77,18 +77,33 @@ class AServer(RawUdpServer):
                 rdata=self.records[key].rdata, ttl=self.records[key].ttl))
         elif not qnm.endswith('exp.schomp.info.'):
             reply.header.rcode = dl.RCODE.REFUSED
+
+        # NS record for the domain
         elif qnm == 'exp.schomp.info.' and request.q.qtype == dl.QTYPE.NS:
             reply.add_auth(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
                 rdata=dl.NS('ns1.exp.schomp.info.'), ttl=3600))
+            reply.add_ar(dl.RR('ns1.exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
+                rdata=dl.A(args.external), ttl=3600))
+
+        # Nameserver or website address
+        elif request.q.qtype == dl.QTYPE.A and (qnm == 'ns1.exp.schomp.info.' or qnm == 'exp.schomp.info.'):
+            reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
+                rdata=dl.A(args.external), ttl=3600))
+
+        # Recursion test
         elif qnm == 'recurse.exp.schomp.info.':
             reply.add_auth(dl.RR('exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
                 rdata=dl.NS('ns1.exp.schomp.info.'), ttl=60))
             reply.add_ar(dl.RR('ns1.exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
-                rdata=dl.A('54.210.32.38'), ttl=60))
+                rdata=dl.A(args.external), ttl=60))
+
+        # TXT record request
         elif request.q.qtype == dl.QTYPE.TXT:
             reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
                 rdata=dl.TXT(("RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
                 addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=60)) # A negligable TTL
+
+        # DNS Web Tool
         elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
             # Validate the query
             parsed = parseQueryString(qnm)
@@ -101,7 +116,7 @@ class AServer(RawUdpServer):
                 
                 # Return a cname from another random record
                 reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=dl.QTYPE.CNAME,\
-                    rdata=dl.CNAME("exp_id-%s.step-%s.cname.dnstool.exp.schomp.info" % (exp_id, step)), ttl=60))
+                    rdata=dl.CNAME("exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)), ttl=60))
 
             elif exp_id and step and parsed['cname']:
                 data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
@@ -232,6 +247,7 @@ if __name__ == "__main__":
                                      description='A simple authoritative DNS server implementation for experiments')
     parser.add_argument('-a', '--address', default='0.0.0.0:53', help='Address to bind upon')                                     
     parser.add_argument('-m', '--mapping', default=None, type=str, help='File containing name to address mappings')
+    parser.add_argument('-e', '--external', default='54.210.32.38')
     parser.add_argument('-u', '--username', default='root')
     parser.add_argument('-p', '--password', default=None)
     parser.add_argument('-q', '--quiet', action='store_true', default=False, help='only print errors')
