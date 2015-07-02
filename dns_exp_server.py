@@ -77,6 +77,14 @@ class AServer(RawUdpServer):
                 rdata=self.records[key].rdata, ttl=self.records[key].ttl))
         elif not qnm.endswith('exp.schomp.info.'):
             reply.header.rcode = dl.RCODE.REFUSED
+        elif qnm == 'exp.schomp.info.' and request.q.qtype == dl.QTYPE.NS:
+            reply.add_auth(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
+                rdata=dl.NS('ns1.exp.schomp.info.'), ttl=3600))
+        elif qnm == 'recurse.exp.schomp.info.':
+            reply.add_auth(dl.RR('exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
+                rdata=dl.NS('ns1.exp.schomp.info.'), ttl=60))
+            reply.add_ar(dl.RR('ns1.exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
+                rdata=dl.A('54.210.32.38'), ttl=60))
         elif request.q.qtype == dl.QTYPE.TXT:
             reply.add_answer(dl.RR(qname, rclass=request.q.qclass, rtype=request.q.qtype,\
                 rdata=dl.TXT(("RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
