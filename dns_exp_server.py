@@ -143,8 +143,8 @@ class AServer(RawUdpServer):
         lst.append(data)
         # Limit the number of probes that we send
         if len(lst) % 4 == 1:
-            logging.info('Testing if %s is an open resolver', data.src_ip)
             query = dl.DNSRecord.question("google.com") # Arbitrary domain name
+            logging.info('Testing if %s is an open resolver tx_id:%s', data.src_ip, query.header.id)
             self.write((data.src_ip, 53), query.pack()) 
         # Insure lists do not grow too large
         while len(lst) > 0 and lst[0].time < datetime.utcnow():
