@@ -51,10 +51,11 @@ class AServer(RawUdpServer):
         qname = response.q.qname
         qclass = dl.CLASS[response.q.qclass]
         qtype = dl.QTYPE[response.q.qtype]
-        
-        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, str(qname), qclass, qtype)
 
-        if response.header.rcode == dl.RCODE.NOERROR and response.header.a > 0 and addr[0] in self.resolvers:
+        ropen = (response.header.rcode == dl.RCODE.NOERROR and response.header.a > 0 and addr[0] in self.resolvers)
+        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s) ans:%s", ip_header.id, qid, addr, str(qname), qclass, qtype, (str(response.a.rdata) if ropen else 'closed'))
+
+        if ropen:
             for data in self.resolvers[addr[0]]:
                 data.open = True
             del self.resolvers[addr[0]]
