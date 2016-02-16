@@ -94,15 +94,15 @@ class AServer(RawUdpServer):
         # Recursion test
         elif qnm == 'recurse.exp.schomp.info.':
             reply.add_auth(dl.RR('exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
-                rdata=dl.NS('ns1.exp.schomp.info.'), ttl=60))
+                rdata=dl.NS('ns1.exp.schomp.info.'), ttl=3600))
             reply.add_ar(dl.RR('ns1.exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
-                rdata=dl.A(args.external), ttl=60))
+                rdata=dl.A(args.external), ttl=3600))
 
         # TXT record request
         elif request.q.qtype == dl.QTYPE.TXT:
             reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.TXT,\
                 rdata=dl.TXT(("RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
-                addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=60)) # A negligable TTL
+                addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=3600)) # A negligable TTL
 
         # DNS Web Tool
         elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
@@ -117,7 +117,7 @@ class AServer(RawUdpServer):
                 
                 # Return a cname from another random record
                 reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.CNAME,\
-                    rdata=dl.CNAME("exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)), ttl=60))
+                    rdata=dl.CNAME("exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)), ttl=3600))
 
             elif exp_id and step and parsed['cname']:
                 data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
@@ -129,7 +129,7 @@ class AServer(RawUdpServer):
             else:
                 # Return the website
                 reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
-                    rdata=dl.A(args.external), ttl=60))
+                    rdata=dl.A(args.external), ttl=3600))
 
         # TODO: Add other tools HERE!
         else:
