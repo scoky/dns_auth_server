@@ -131,6 +131,9 @@ class AServer(RawUdpServer):
                 reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
                     rdata=dl.A(args.external), ttl=3600))
 
+        # Return no answer, no error for the AAAA record
+        elif request.q.qtype == dl.QTYPE.AAAA and qnm.endswith('dnstool.exp.schomp.info.'):
+            pass
         # TODO: Add other tools HERE!
         else:
             # Error
