@@ -69,7 +69,7 @@ class AServer(RawUdpServer):
         
         logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, str(qname), qclass, qtype)
 
-        reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=0), q=request.q)
+        reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=0, rd=0, tc=0), q=request.q)
         
         # Lookup to see if this name is in records
         key = qnm+qclass+qtype
@@ -81,10 +81,15 @@ class AServer(RawUdpServer):
 
         # NS record for the domain
         elif qnm == 'exp.schomp.info.' and request.q.qtype == dl.QTYPE.NS:
-            reply.add_auth(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
+            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
                 rdata=dl.NS('ns1.exp.schomp.info.'), ttl=3600))
             reply.add_ar(dl.RR('ns1.exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
                 rdata=dl.A(args.external), ttl=3600))
+
+        # SOA record for the domain
+        elif qnm == 'exp.schomp.info.' and request.q.qtype == dl.QTYPE.SOA:
+            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.SOA,\
+                rdata=dl.SOA("ns1.exp.schomp.info.", "admin.exp.schomp.info.", (20160320,3600,3600,3600,3600)), ttl=3600))
 
         # Nameserver or website address
         elif request.q.qtype == dl.QTYPE.A and (qnm == 'ns1.exp.schomp.info.' or qnm == 'exp.schomp.info.'):
@@ -134,6 +139,7 @@ class AServer(RawUdpServer):
         # Return no answer, no error for the AAAA record
         elif request.q.qtype == dl.QTYPE.AAAA and qnm.endswith('dnstool.exp.schomp.info.'):
             pass
+
         # TODO: Add other tools HERE!
         else:
             # Error
