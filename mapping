@@ -1,3 +1,7 @@
-# This is a comment
-# qname qclass qtype ttl ans
-test.exp.schomp.info.   IN      A       3600    1.1.1.1
+; This is a comment
+; qname qclass qtype ttl ans
+$ORIGIN exp.schomp.info.
+@        3600   IN      SOA     ns1.schomp.info. admin.schomp.info. 1474557685 3600 3600 3600 1
+@        3600   IN      NS      ns1.schomp.info.
+@        3600   IN      NS      ns2.schomp.info.
+test     3600   IN      A       1.1.1.1

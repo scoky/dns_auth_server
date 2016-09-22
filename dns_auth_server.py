@@ -19,7 +19,7 @@ try:
     from dns.rdatatype import SOA,NS,A,AAAA,TXT
     from dns.rdataclass import IN
     import dns.rdata as rdata
-    import dns.resolver as dnsresolver
+    from dns import message
 except:
     raise Exception('Is dnspython installed?')
 

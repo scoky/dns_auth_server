@@ -7,12 +7,26 @@ import Queue
 import logging
 import argparse
 import traceback
-import dnslib as dl
-import mysql.connector
 from threading import Thread,Timer
 from raw_server import RawUdpServer
 from collections import defaultdict
 from datetime import datetime,timedelta
+
+try:
+    import mysql.connector
+except:
+    print >>sys.stderr, 'Could not load mysql.connector. Will not be able to interface with the database'
+
+try:
+    import dns.zone as zone
+    import dns.rdatatype as rtype
+    import dns.rdataclass as rclass
+    import dns.flags as flags
+    import dns.rrset as rrset
+    import dns.rcode  as rcode
+    from dns import message
+except:
+    raise Exception('Is dnspython installed?')
 
 def parseQueryString(qnm):
     tokens = qnm.split('.')
@@ -31,6 +45,7 @@ class AServer(RawUdpServer):
         super(AServer, self).__init__(*args)
         self.inserter = DatabaseInserter()
         self.resolvers = defaultdict(list)
+        self.zones = []
 
     def run(self):
         self.inserter.start()
@@ -40,20 +55,21 @@ class AServer(RawUdpServer):
             self.inserter.terminate()
 
     def read(self, ip_header, udp_header, addr, data):
-        packet = dl.DNSRecord.parse(data)
-        if packet.header.qr:
+        packet = message.from_wire(data)
+        if packet.flags & flags.QR:
             self.read_response(ip_header, udp_header, addr, packet)
         else:
             self.read_request(ip_header, udp_header, addr, packet)
 
     def read_response(self, ip_header, udp_header, addr, response):
-        qid = response.header.id
-        qname = response.q.qname
-        qclass = dl.CLASS[response.q.qclass]
-        qtype = dl.QTYPE[response.q.qtype]
+        qid = response.id
+        qname = response.question[0].name
+        qclass = rclass.to_text(response.question[0].rdclass)
+        qtype = rtype.to_text(response.question[0].rdtype)
 
-        ropen = (response.header.rcode == dl.RCODE.NOERROR and response.header.a > 0 and addr[0] in self.resolvers)
-        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s) ans:%s", ip_header.id, qid, addr, str(qname), qclass, qtype, (str(response.a.rdata) if ropen else 'closed'))
+        ropen = (response.rcode() == rcode.NOERROR and len(response.answer) > 0 and addr[0] in self.resolvers)
+        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s) ans:%s", ip_header.id, qid, addr, str(qname), \
+                    qclass, qtype, (str(response.answer[0][0]) if ropen else 'closed'))
 
         if ropen:
             for data in self.resolvers[addr[0]]:
@@ -61,56 +77,31 @@ class AServer(RawUdpServer):
             del self.resolvers[addr[0]]
         
     def read_request(self, ip_header, udp_header, addr, request):
-        qid = request.header.id
-        qname = request.q.qname
+        qid = request.id
+        qname = request.question[0].name
         qnm = str(qname).lower()
-        qclass = dl.CLASS[request.q.qclass]
-        qtype = dl.QTYPE[request.q.qtype]
+        qclass = request.question[0].rdclass
+        qtype = request.question[0].rdtype
         
-        logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, str(qname), qclass, qtype)
+        logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, \
+                    str(qname), rclass.to_text(qclass), rtype.to_text(qtype))
 
-        reply = dl.DNSRecord(dl.DNSHeader(id=qid, qr=1, aa=1, ra=0, rd=0, tc=0), q=request.q)
-        
-        # Lookup to see if this name is in records
-        key = qnm+qclass+qtype
-        if key in self.records:
-            reply.add_answer(dl.RR(qname, rclass=self.records[key].rclass, rtype=self.records[key].rtype,\
-                rdata=self.records[key].rdata, ttl=self.records[key].ttl))
-        elif not qnm.endswith('exp.schomp.info.'):
-            reply.header.rcode = dl.RCODE.REFUSED
+        reply = message.make_response(request)
+        # reply.flags |= flags.QR | flags.AA
+        # reply.flags = (reply.flags | flags.RA | flags.TC) ^ (flags.RA | flags.TC)
 
-        # NS record for the domain
-        elif qnm == 'exp.schomp.info.' and request.q.qtype == dl.QTYPE.NS:
-            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
-                rdata=dl.NS('ns1.exp.schomp.info.'), ttl=3600))
-            reply.add_ar(dl.RR('ns1.exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
-                rdata=dl.A(args.external), ttl=3600))
-
-        # SOA record for the domain
-        elif qnm == 'exp.schomp.info.' and request.q.qtype == dl.QTYPE.SOA:
-            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.SOA,\
-                rdata=dl.SOA("ns1.exp.schomp.info.", "admin.exp.schomp.info.", (20160320,3600,3600,3600,3600)), ttl=3600))
-
-        # Nameserver or website address
-        elif request.q.qtype == dl.QTYPE.A and (qnm == 'ns1.exp.schomp.info.' or qnm == 'exp.schomp.info.'):
-            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
-                rdata=dl.A(args.external), ttl=3600))
-
-        # Recursion test
-        elif qnm == 'recurse.exp.schomp.info.':
-            reply.add_auth(dl.RR('exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.NS,\
-                rdata=dl.NS('ns1.exp.schomp.info.'), ttl=3600))
-            reply.add_ar(dl.RR('ns1.exp.schomp.info.', rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
-                rdata=dl.A(args.external), ttl=3600))
+        # Recursion test - keep referring the resolver back to self
+        if qnm == 'recurse.exp.schomp.info.':
+            reply.answer.append(rrset.from_text('exp.schomp.info.', 3600, rclass.IN, rtype.NS, 'ns1.exp.schomp.info.'))
 
         # TXT record request
-        elif request.q.qtype == dl.QTYPE.TXT:
-            reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.TXT,\
-                rdata=dl.TXT(("RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
-                addr[1], qname, qid, ip_header.id, datetime.utcnow()))), ttl=3600)) # A negligable TTL
+        elif qtype == rtype.TXT and qnm.endswith('stat.exp.schomp.info.'):
+                reply.answer.append(rrset.from_text(qname, 1, rclass.IN, rtype.TXT, \
+                    "RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
+                    addr[1], qname, qid, ip_header.id, datetime.utcnow())))
 
         # DNS Web Tool
-        elif request.q.qtype == dl.QTYPE.A and qnm.endswith('dnstool.exp.schomp.info.'):
+        elif qtype == rtype.A and qnm.endswith('dnstool.exp.schomp.info.'):
             # Validate the query
             parsed = parseQueryString(qnm)
             exp_id = parsed['exp_id']
@@ -121,8 +112,8 @@ class AServer(RawUdpServer):
                 self.check_resolver(data)
                 
                 # Return a cname from another random record
-                reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.CNAME,\
-                    rdata=dl.CNAME("exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)), ttl=3600))
+                reply.answer.append(rrset.from_text(qname, 10, rclass.IN, rtype.CNAME, \
+                    "exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)))
 
             elif exp_id and step and parsed['cname']:
                 data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
@@ -130,51 +121,46 @@ class AServer(RawUdpServer):
                 self.check_resolver(data)
 
                 # Return NXDOMAIN to stop the webpage fetch
-                reply.header.rcode = dl.RCODE.NXDOMAIN
+                reply.rcode = rcode.NXDOMAIN
             else:
                 # Return the website
-                reply.add_answer(dl.RR(qname, rclass=dl.CLASS.IN, rtype=dl.QTYPE.A,\
-                    rdata=dl.A(args.external), ttl=3600))
-
-        # Return no answer, no error for the AAAA record
-        elif request.q.qtype == dl.QTYPE.AAAA and qnm.endswith('dnstool.exp.schomp.info.'):
-            pass
+                reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.A, args.external))
 
         # TODO: Add other tools HERE!
         else:
-            # Error
-            reply.header.rcode = dl.RCODE.NXDOMAIN
+            # Lookup to see if this name is in one of our zone files
+            for z in self.zones:
+                if qname.is_subdomain(z.origin):
+                    try:
+                        rr = z.find_rrset(qname, qtype)
+                        reply.answer.append(rr)
+                        break
+                    except KeyError:
+                        continue
         
-        self.write(addr, reply.pack())
+        self.write(addr, reply.to_wire())
         
     def check_resolver(self, data):
         lst = self.resolvers[data.src_ip]
         lst.append(data)
         # Limit the number of probes that we send
         if len(lst) % 4 == 1:
-            query = dl.DNSRecord.question("google.com") # Arbitrary domain name
-            logging.info('Testing if %s is an open resolver tx_id:%s', data.src_ip, query.header.id)
-            self.write((data.src_ip, 53), query.pack()) 
+            query = message.make_query('google.com.') # Arbitrary domain name
+            logging.info('Testing if %s is an open resolver tx_id:%s', data.src_ip, query.id)
+            self.write((data.src_ip, 53), query.to_wire()) 
         # Insure lists do not grow too large
         while len(lst) > 0 and lst[0].time < datetime.utcnow():
             del lst[0]
 
-    def refresh_records(self):        
-        records = {}
+    def refresh_records(self):
+        zones = []
         if args.mapping != None:
             try:
-                for line in open(args.mapping, 'r'):
-                    if line.startswith('#'):
-                        continue
-                    qname,qclass,qtype,ttl,ans = line.split()
-                    records[qname.lower()+qclass+qtype] = dl.RR(qname, rclass=dl.CLASS.reverse[qclass],\
-                        rtype=dl.QTYPE.reverse[qtype], rdata=getattr(dl, qtype)(ans), ttl=int(ttl))
-                    if dl.QTYPE.reverse[qtype] == dl.QTYPE.CNAME:
-                        records[qname.lower()+qclass+'A'] = dl.RR(qname, rclass=dl.CLASS.reverse[qclass],\
-                            rtype=dl.QTYPE.reverse[qtype], rdata=getattr(dl, qtype)(ans), ttl=int(ttl))
+                z = zone.from_file(args.mapping)
+                zones.append(z)
             except Exception as e:
                logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
-        self.records = records
+        self.zones = zones
 
 
 add_query_db = ("INSERT INTO queries "
@@ -261,10 +247,6 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbose', action='store_true', default=False, help='print debug info. --quiet wins if both are present')
     args = parser.parse_args()
     
-    addr,port = args.address.split(':', 1)
-    server = AServer((addr, int(port)))
-    server.refresh_records()
-
     # set up logging
     if args.quiet:
         level = logging.WARNING
@@ -276,6 +258,12 @@ if __name__ == "__main__":
         format = "%(levelname) -10s %(asctime)s %(module)s:%(lineno) -7s %(message)s",
         level = level
     )
+    
+    addr,port = args.address.split(':', 1)
+    server = AServer((addr, int(port)))
+    logging.info('listening on {0}:{1}'.format(addr, port))
+    server.refresh_records()
+    logging.info('loaded zone files')
 
     try:
         server.run()
