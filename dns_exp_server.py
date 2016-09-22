@@ -156,7 +156,7 @@ class AServer(RawUdpServer):
         zones = []
         if args.mapping != None:
             try:
-                z = zone.from_file(args.mapping)
+                z = zone.from_file(args.mapping, relativize = False)
                 zones.append(z)
             except Exception as e:
                logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
