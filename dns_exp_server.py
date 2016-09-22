@@ -75,14 +75,14 @@ class AServer(RawUdpServer):
             for data in self.resolvers[addr[0]]:
                 data.open = True
             del self.resolvers[addr[0]]
-        
+
     def read_request(self, ip_header, udp_header, addr, request):
         qid = request.id
         qname = request.question[0].name
         qnm = str(qname).lower()
         qclass = request.question[0].rdclass
         qtype = request.question[0].rdtype
-        
+
         logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, \
                     str(qname), rclass.to_text(qclass), rtype.to_text(qtype))
 
@@ -92,7 +92,7 @@ class AServer(RawUdpServer):
 
         # Recursion test - keep referring the resolver back to self
         if qnm == 'recurse.exp.schomp.info.':
-            reply.answer.append(rrset.from_text('exp.schomp.info.', 3600, rclass.IN, rtype.NS, 'ns1.exp.schomp.info.'))
+            reply.answer.append(rrset.from_text('exp.schomp.info.', 0, rclass.IN, rtype.NS, 'ns1.exp.schomp.info.'))
 
         # TXT record request
         elif qtype == rtype.TXT and qnm.endswith('stat.exp.schomp.info.'):
@@ -110,7 +110,7 @@ class AServer(RawUdpServer):
                 data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
                 self.inserter.addItem(data)
                 self.check_resolver(data)
-                
+
                 # Return a cname from another random record
                 reply.answer.append(rrset.from_text(qname, 10, rclass.IN, rtype.CNAME, \
                     "exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)))
@@ -125,6 +125,11 @@ class AServer(RawUdpServer):
             else:
                 # Return the website
                 reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.A, args.external))
+
+        elif qtype == rtype.A and qnm.ednswith('chain.exp.schomp.info.'):
+            reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.NS, 'cname1.{0}'.format(qname)))
+            reply.answer.append(rrset.from_text('cname1.{0}'.format(qname), 3600, rclass.IN, rtype.NS, 'cname2.{0}'.format(qname)))
+            reply.answer.append(rrset.from_text('cname2.{0}'.format(qname), 3600, rclass.IN, rtype.A, '1.2.3.4'))
 
         # TODO: Add other tools HERE!
         else:
