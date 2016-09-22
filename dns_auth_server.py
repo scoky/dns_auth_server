@@ -14,6 +14,15 @@ from collections import defaultdict
 from datetime import datetime,timedelta
 import mysql.connector
 
+try:
+    from dns.zone import Zone
+    from dns.rdatatype import SOA,NS,A,AAAA,TXT
+    from dns.rdataclass import IN
+    import dns.rdata as rdata
+    import dns.resolver as dnsresolver
+except:
+    raise Exception('Is dnspython installed?')
+
 def parseQueryString(qnm):
     tokens = qnm.split('.')
     res = defaultdict(bool)
