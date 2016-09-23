@@ -92,16 +92,19 @@ class AServer(RawUdpServer):
 
         # Recursion test - keep referring the resolver back to self
         if qnm == 'recurse.exp.schomp.info.':
+            reply.flags |= flags.AA
             reply.answer.append(rrset.from_text('exp.schomp.info.', 0, rclass.IN, rtype.NS, 'ns1.exp.schomp.info.'))
 
         # TXT record request
         elif qtype == rtype.TXT and qnm.endswith('stat.exp.schomp.info.'):
-                reply.answer.append(rrset.from_text(qname, 1, rclass.IN, rtype.TXT, \
-                    "RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
-                    addr[1], qname, qid, ip_header.id, datetime.utcnow())))
+            reply.flags |= flags.AA
+            reply.answer.append(rrset.from_text(qname, 1, rclass.IN, rtype.TXT, \
+                "RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
+                addr[1], qname, qid, ip_header.id, datetime.utcnow())))
 
         # DNS Web Tool
         elif qtype == rtype.A and qnm.endswith('dnstool.exp.schomp.info.'):
+            reply.flags |= flags.AA
             # Validate the query
             parsed = parseQueryString(qnm)
             exp_id = parsed['exp_id']
@@ -127,6 +130,7 @@ class AServer(RawUdpServer):
                 reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.A, args.external))
 
         elif qtype == rtype.A and qnm.ednswith('chain.exp.schomp.info.'):
+            reply.flags |= flags.AA
             reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.NS, 'cname1.{0}'.format(qname)))
             reply.answer.append(rrset.from_text('cname1.{0}'.format(qname), 3600, rclass.IN, rtype.NS, 'cname2.{0}'.format(qname)))
             reply.answer.append(rrset.from_text('cname2.{0}'.format(qname), 3600, rclass.IN, rtype.A, '1.2.3.4'))
@@ -138,6 +142,7 @@ class AServer(RawUdpServer):
                 if qname.is_subdomain(z.origin):
                     try:
                         rr = z.find_rrset(qname, qtype)
+                        reply.flags |= flags.AA
                         reply.answer.append(rr)
                         break
                     except KeyError:
