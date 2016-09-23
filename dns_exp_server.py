@@ -103,7 +103,7 @@ class AServer(RawUdpServer):
                 addr[1], qname, qid, ip_header.id, datetime.utcnow())))
 
         # DNS Web Tool
-        elif qtype == rtype.A and qnm.endswith('dnstool.exp.schomp.info.'):
+        elif qtype == rtype.A and qnm.endswith('.dnstool.exp.schomp.info.'):
             reply.flags |= flags.AA
             # Validate the query
             parsed = parseQueryString(qnm)
@@ -124,12 +124,9 @@ class AServer(RawUdpServer):
                 self.check_resolver(data)
 
                 # Return NXDOMAIN to stop the webpage fetch
-                reply.rcode = rcode.NXDOMAIN
-            else:
-                # Return the website
-                reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.A, args.external))
+                reply.set_rcode(rcode.NXDOMAIN)
 
-        elif qtype == rtype.A and qnm.ednswith('chain.exp.schomp.info.'):
+        elif qtype == rtype.A and qnm.endswith('chain.exp.schomp.info.'):
             reply.flags |= flags.AA
             reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.NS, 'cname1.{0}'.format(qname)))
             reply.answer.append(rrset.from_text('cname1.{0}'.format(qname), 3600, rclass.IN, rtype.NS, 'cname2.{0}'.format(qname)))
@@ -155,7 +152,7 @@ class AServer(RawUdpServer):
         lst.append(data)
         # Limit the number of probes that we send
         if len(lst) % 4 == 1:
-            query = message.make_query('google.com.') # Arbitrary domain name
+            query = message.make_query('google.com.', rtype.A) # Arbitrary domain name
             logging.info('Testing if %s is an open resolver tx_id:%s', data.src_ip, query.id)
             self.write((data.src_ip, 53), query.to_wire()) 
         # Insure lists do not grow too large
@@ -226,8 +223,9 @@ class DatabaseInserter(Thread):
             
             #logging.info('Performing database insert of %s', data)
             
-            cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
+            cnx = None
             try:
+                cnx = mysql.connector.connect(user=args.username, password=args.password, host='localhost', database='dnstool')
                 cursor = cnx.cursor()
                 cursor.executemany(add_query_db, data)
                 cnx.commit()
@@ -235,7 +233,8 @@ class DatabaseInserter(Thread):
             except Exception as e:
                 logging.error('Error on database: %s\n%s', e, traceback.format_exc())
             finally:
-                cnx.close()
+                if cnx is not None:
+                    cnx.close()
         self.running = False
                 
     def terminate(self):
@@ -249,8 +248,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,\
                                      description='A simple authoritative DNS server implementation for experiments')
     parser.add_argument('-a', '--address', default='0.0.0.0:53', help='Address to bind upon')                                     
-    parser.add_argument('-m', '--mapping', default=None, type=str, help='File containing name to address mappings')
-    parser.add_argument('-e', '--external', default='54.210.32.38')
+    parser.add_argument('-m', '--mapping', default=None, help='File containing name to address mappings')
     parser.add_argument('-u', '--username', default='root')
     parser.add_argument('-p', '--password', default=None)
     parser.add_argument('-q', '--quiet', action='store_true', default=False, help='only print errors')
