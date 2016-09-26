@@ -27,7 +27,7 @@ class RawUdpServer(object):
                 # Ignore packets not destined for us
                 if udppkt.dport != self.port: # or ippkt.dst != self.addr:
                     continue
-                logging.info('packet received')
+
                 # Process the packet
                 self.read(ippkt, udppkt, (socket.inet_ntoa(ippkt.src), udppkt.sport), udppkt.data)
             except (KeyboardInterrupt, SystemExit):
