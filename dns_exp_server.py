@@ -13,11 +13,6 @@ from collections import defaultdict
 from datetime import datetime,timedelta
 
 try:
-    import mysql.connector
-except:
-    print >>sys.stderr, 'Could not load mysql.connector. Will not be able to interface with the database'
-
-try:
     import dns.zone as zone
     import dns.rdatatype as rtype
     import dns.rdataclass as rclass
@@ -27,6 +22,13 @@ try:
     from dns import message
 except:
     raise Exception('Is dnspython installed?')
+
+from dns_tree import dns_tree,dns_tree_node
+
+try:
+    import mysql.connector
+except:
+    print >>sys.stderr, 'Could not load mysql.connector. Will not be able to interface with the database'
 
 def parseQueryString(qnm):
     tokens = qnm.split('.')
@@ -45,7 +47,7 @@ class AServer(RawUdpServer):
         super(AServer, self).__init__(*args)
         self.inserter = DatabaseInserter()
         self.resolvers = defaultdict(list)
-        self.zones = []
+        self.tree = dns_tree()
 
     def run(self):
         self.inserter.start()
@@ -138,15 +140,7 @@ class AServer(RawUdpServer):
         # TODO: Add other tools HERE!
         else:
             # Lookup to see if this name is in one of our zone files
-            for z in self.zones:
-                if qname.is_subdomain(z.origin):
-                    try:
-                        rr = z.find_rrset(qname, qtype)
-                        reply.flags |= flags.AA
-                        reply.answer.append(rr)
-                        break
-                    except KeyError:
-                        continue
+            tree.respond(query, reply)
         
         self.write(addr, reply.to_wire())
         
@@ -163,15 +157,19 @@ class AServer(RawUdpServer):
             del lst[0]
 
     def refresh_records(self):
-        zones = []
+        tree = dns_tree()
         if args.mapping != None:
             try:
                 z = zone.from_file(args.mapping, relativize = False)
-                zones.append(z)
+                for n in z:
+                    node = dns_tree_node(n)
+                    for rdataset in z[n].rdatasets:
+                        node.rrsets.append(rrset.from_rdata_list(n, rdataset.ttl, rdataset))
+                    tree.add(node)
             except Exception as e:
                logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
-        self.zones = zones
-
+        print tree
+        self.tree = tree
 
 add_query_db = ("INSERT INTO queries "
                "(exp_id, src_ip, src_port, query, trans_id, ip_id, open, time) "
