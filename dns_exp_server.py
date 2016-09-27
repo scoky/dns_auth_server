@@ -79,55 +79,8 @@ class AServer(RawUdpServer):
                     str(qname), rclass.to_text(qclass), rtype.to_text(qtype))
 
         reply = message.make_response(pkt.dns_packet)
-        # reply.flags |= flags.QR | flags.AA
-        # reply.flags = (reply.flags | flags.RA | flags.TC) ^ (flags.RA | flags.TC)
-
-        # Recursion test - keep referring the resolver back to self
-        if qnm == 'recurse.exp.schomp.info.':
-            reply.flags |= flags.AA
-            reply.answer.append(rrset.from_text('exp.schomp.info.', 0, rclass.IN, rtype.NS, 'ns1.exp.schomp.info.'))
-
-        # TXT record request
-        elif qtype == rtype.TXT and qnm.endswith('stat.exp.schomp.info.'):
-            reply.flags |= flags.AA
-            reply.answer.append(rrset.from_text(qname, 1, rclass.IN, rtype.TXT, \
-                "RESOLVER=%s | PORT=%s | QUERY=%s | TRANSACTION=%s | IPID=%s | TIME=%s" % (addr[0],\
-                addr[1], qname, qid, ip_header.id, datetime.utcnow())))
-
-        # DNS Web Tool
-        elif qtype == rtype.A and qnm.endswith('.dnstool.exp.schomp.info.'):
-            reply.flags |= flags.AA
-            # Validate the query
-            parsed = parseQueryString(qnm)
-            exp_id = parsed['exp_id']
-            step = parsed['step']
-            if exp_id and step and not parsed['cname']:
-                data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
-                self.inserter.addItem(data)
-                self.check_resolver(data)
-
-                # Return a cname from another random record
-                reply.answer.append(rrset.from_text(qname, 10, rclass.IN, rtype.CNAME, \
-                    "exp_id-%s.step-%s.cname.dnstool.exp.schomp.info." % (exp_id, step)))
-
-            elif exp_id and step and parsed['cname']:
-                data = QueryData(exp_id, addr[0], addr[1], str(qname), qid, ip_header.id)
-                self.inserter.addItem(data)
-                self.check_resolver(data)
-
-                # Return NXDOMAIN to stop the webpage fetch
-                reply.set_rcode(rcode.NXDOMAIN)
-
-        elif qtype == rtype.A and qnm.endswith('chain.exp.schomp.info.'):
-            reply.flags |= flags.AA
-            reply.answer.append(rrset.from_text(qname, 3600, rclass.IN, rtype.NS, 'cname1.{0}'.format(qname)))
-            reply.answer.append(rrset.from_text('cname1.{0}'.format(qname), 3600, rclass.IN, rtype.NS, 'cname2.{0}'.format(qname)))
-            reply.answer.append(rrset.from_text('cname2.{0}'.format(qname), 3600, rclass.IN, rtype.A, '1.2.3.4'))
-
-        # TODO: Add other tools HERE!
-        else:
-            # Lookup to see if this name is in one of our zone files
-            tree.respond(pkt, reply)
+        # Lookup to see if this name is in one of our zone files
+        tree.respond(pkt, reply)
         
         self.write(addr, reply.to_wire())
         
