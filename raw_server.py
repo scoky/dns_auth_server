@@ -7,6 +7,13 @@ import traceback
 import dpkt
 import socket
 
+class RawPacket(object):
+    def __init__(self, ippkt, udppkt, data):
+        self.ip_header = ippkt
+        self.udp_header = udppkt
+        self.data = data
+        self.src_addr = (socket.inet_ntoa(ippkt.src), udppkt.sport)
+
 # Template for a raw socket udp server               
 class RawUdpServer(object):
     def __init__(self, addr):
@@ -29,14 +36,14 @@ class RawUdpServer(object):
                     continue
 
                 # Process the packet
-                self.read(ippkt, udppkt, (socket.inet_ntoa(ippkt.src), udppkt.sport), udppkt.data)
+                self.read(RawPacket(ippkt, udppkt, udppkt.data))
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception as e:
                 logging.error('Error on recv: %s\n%s', e, traceback.format_exc())
         self.running = False
         
-    def read(self, ip_header, udp_header, saddr, data):
+    def read(self, pkt):
         pass
         
     def terminate(self):

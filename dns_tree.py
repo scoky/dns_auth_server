@@ -20,7 +20,7 @@ class dns_tree_node(object):
         
     def respond(self, query, response):
         for rr in self.rrsets:
-            if rr.rdclass == query.question[0].rdclass and rr.rdtype == query.question[0].rdtype:
+            if rr.rdclass == query.dns_packet.question[0].rdclass and rr.rdtype == query.dns_packet.question[0].rdtype:
                 response.answer.append(rr)
                 reply.flags |= flags.AA
                 return
@@ -62,13 +62,13 @@ class dns_tree(object):
         return None
         
     def respond(self, query, response):
-        print "find {0}".format(query.question[0].name)
+        print "find {0}".format(query.dns_packet.question[0].name)
         return self._find(query, response, self.roots)
         
     def _respond(self, query, response, nodes):
         print nodes
         for n in nodes:
-            reln, _, labels = n.name.fullcompare(query.question[0].name)
+            reln, _, labels = n.name.fullcompare(query.dns_packet.question[0].name)
             if reln == dnsname.NAMERELN_SUPERDOMAIN: # Recurse into children
                 print "{0} is super".format(n)
                 return self._find(query, response, n.children)

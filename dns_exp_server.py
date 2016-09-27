@@ -24,22 +24,12 @@ except:
     raise Exception('Is dnspython installed?')
 
 from dns_tree import dns_tree,dns_tree_node
+from experiments import load_experiments
 
 try:
     import mysql.connector
 except:
     print >>sys.stderr, 'Could not load mysql.connector. Will not be able to interface with the database'
-
-def parseQueryString(qnm):
-    tokens = qnm.split('.')
-    res = defaultdict(bool)
-    for token in tokens:
-        t = token.split('-', 1)
-        if len(t) == 2:
-            res[t[0]] = t[1]
-        else:
-            res[t[0]] = True
-    return res
 
 # Authoritative DNS server for experiments
 class AServer(RawUdpServer):
@@ -56,39 +46,39 @@ class AServer(RawUdpServer):
         finally:
             self.inserter.terminate()
 
-    def read(self, ip_header, udp_header, addr, data):
-        packet = message.from_wire(data)
-        if packet.flags & flags.QR:
-            self.read_response(ip_header, udp_header, addr, packet)
+    def read(self, pkt):
+        pkt.dns_packet = message.from_wire(pkt.data)
+        if pkt.dns_packet.flags & flags.QR:
+            self.read_response(pkt)
         else:
-            self.read_request(ip_header, udp_header, addr, packet)
+            self.read_request(pkt)
 
-    def read_response(self, ip_header, udp_header, addr, response):
-        qid = response.id
-        qname = response.question[0].name
-        qclass = rclass.to_text(response.question[0].rdclass)
-        qtype = rtype.to_text(response.question[0].rdtype)
+    def read_response(self, pkt):
+        qid = pkt.dns_packet.id
+        qname = pkt.dns_packet.question[0].name
+        qclass = rclass.to_text(pkt.dns_packet.question[0].rdclass)
+        qtype = rtype.to_text(pkt.dns_packet.question[0].rdtype)
 
-        ropen = (response.rcode() == rcode.NOERROR and len(response.answer) > 0 and addr[0] in self.resolvers)
-        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s) ans:%s", ip_header.id, qid, addr, str(qname), \
-                    qclass, qtype, (str(response.answer[0][0]) if ropen else 'closed'))
+        ropen = (pkt.dns_packet.rcode() == rcode.NOERROR and len(pkt.dns_packet.answer) > 0 and pkt.src_addr[0] in self.resolvers)
+        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s) ans:%s", pkt.ip_header.id, qid, pkt.src_addr, str(qname), \
+                    qclass, qtype, (str(pkt.dns_packet.answer[0][0]) if ropen else 'closed'))
 
         if ropen:
-            for data in self.resolvers[addr[0]]:
+            for data in self.resolvers[pkt.src_addr[0]]:
                 data.open = True
-            del self.resolvers[addr[0]]
+            del self.resolvers[pkt.src_addr[0]]
 
-    def read_request(self, ip_header, udp_header, addr, request):
-        qid = request.id
-        qname = request.question[0].name
+    def read_request(self, pkt):
+        qid = pkt.dns_packet.id
+        qname = pkt.dns_packet.question[0].name
         qnm = str(qname).lower()
-        qclass = request.question[0].rdclass
-        qtype = request.question[0].rdtype
+        qclass = pkt.dns_packet.question[0].rdclass
+        qtype = pkt.dns_packet.question[0].rdtype
 
-        logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", ip_header.id, qid, addr, \
+        logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", pkt.ip_header.id, qid, pkt.src_addr, \
                     str(qname), rclass.to_text(qclass), rtype.to_text(qtype))
 
-        reply = message.make_response(request)
+        reply = message.make_response(pkt.dns_packet)
         # reply.flags |= flags.QR | flags.AA
         # reply.flags = (reply.flags | flags.RA | flags.TC) ^ (flags.RA | flags.TC)
 
@@ -137,7 +127,7 @@ class AServer(RawUdpServer):
         # TODO: Add other tools HERE!
         else:
             # Lookup to see if this name is in one of our zone files
-            tree.respond(query, reply)
+            tree.respond(pkt, reply)
         
         self.write(addr, reply.to_wire())
         
@@ -165,6 +155,7 @@ class AServer(RawUdpServer):
                     tree.add(node)
             except Exception as e:
                logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
+        load_experiments(tree)
         print tree
         self.tree = tree
 
