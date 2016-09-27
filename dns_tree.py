@@ -63,7 +63,7 @@ class dns_tree(object):
         
     def respond(self, query, response):
         print "find {0}".format(query.dns_packet.question[0].name)
-        return self._find(query, response, self.roots)
+        return self._respond(query, response, self.roots)
         
     def _respond(self, query, response, nodes):
         print nodes
@@ -71,7 +71,7 @@ class dns_tree(object):
             reln, _, labels = n.name.fullcompare(query.dns_packet.question[0].name)
             if reln == dnsname.NAMERELN_SUPERDOMAIN: # Recurse into children
                 print "{0} is super".format(n)
-                return self._find(query, response, n.children)
+                return self._respond(query, response, n.children)
             elif reln == dnsname.NAMERELN_EQUAL or (labels == len(n.name.labels) - 1 and n.name.is_wild()): # Found the node
                 print "{0} matches".format(n)
                 n.respond(query, response)

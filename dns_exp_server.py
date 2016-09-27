@@ -80,7 +80,7 @@ class AServer(RawUdpServer):
 
         reply = message.make_response(pkt.dns_packet)
         # Lookup to see if this name is in one of our zone files
-        tree.respond(pkt, reply)
+        self.tree.respond(pkt, reply)
         
         self.write(addr, reply.to_wire())
         
@@ -108,7 +108,7 @@ class AServer(RawUdpServer):
                     tree.add(node)
             except Exception as e:
                logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
-        load_experiments(tree)
+        load_experiments(tree, self)
         print tree
         self.tree = tree
 
