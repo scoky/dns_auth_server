@@ -7,10 +7,10 @@ import Queue
 import logging
 import argparse
 import traceback
-from threading import Thread,Timer
 from raw_server import RawUdpServer
 from collections import defaultdict
 from datetime import datetime,timedelta
+from threading import Thread,Timer
 
 try:
     import dns.zone as zone
@@ -31,106 +31,9 @@ try:
 except:
     print >>sys.stderr, 'Could not load mysql.connector. Will not be able to interface with the database'
 
-# Authoritative DNS server for experiments
-class AServer(RawUdpServer):
-    def __init__(self, *args):
-        super(AServer, self).__init__(*args)
-        self.inserter = DatabaseInserter()
-        self.resolvers = defaultdict(list)
-        self.tree = dns_tree()
-
-    def run(self):
-        self.inserter.start()
-        try:
-            super(AServer, self).run()
-        finally:
-            self.inserter.terminate()
-
-    def read(self, pkt):
-        pkt.dns_packet = message.from_wire(pkt.data)
-        if pkt.dns_packet.flags & flags.QR:
-            self.read_response(pkt)
-        else:
-            self.read_request(pkt)
-
-    def read_response(self, pkt):
-        qid = pkt.dns_packet.id
-        qname = pkt.dns_packet.question[0].name
-        qclass = rclass.to_text(pkt.dns_packet.question[0].rdclass)
-        qtype = rtype.to_text(pkt.dns_packet.question[0].rdtype)
-
-        ropen = (pkt.dns_packet.rcode() == rcode.NOERROR and len(pkt.dns_packet.answer) > 0 and pkt.src_addr[0] in self.resolvers)
-        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s) ans:%s", pkt.ip_header.id, qid, pkt.src_addr, str(qname), \
-                    qclass, qtype, (str(pkt.dns_packet.answer[0][0]) if ropen else 'closed'))
-
-        if ropen:
-            for data in self.resolvers[pkt.src_addr[0]]:
-                data.open = True
-            del self.resolvers[pkt.src_addr[0]]
-
-    def read_request(self, pkt):
-        qid = pkt.dns_packet.id
-        qname = pkt.dns_packet.question[0].name
-        qnm = str(qname).lower()
-        qclass = pkt.dns_packet.question[0].rdclass
-        qtype = pkt.dns_packet.question[0].rdtype
-
-        logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", pkt.ip_header.id, qid, pkt.src_addr, \
-                    str(qname), rclass.to_text(qclass), rtype.to_text(qtype))
-
-        reply = message.make_response(pkt.dns_packet)
-        # Lookup to see if this name is in one of our zone files
-        self.tree.respond(pkt, reply)
-        
-        self.write(addr, reply.to_wire())
-        
-    def check_resolver(self, data):
-        lst = self.resolvers[data.src_ip]
-        lst.append(data)
-        # Limit the number of probes that we send
-        if len(lst) % 4 == 1:
-            query = message.make_query('google.com.', rtype.A) # Arbitrary domain name
-            logging.info('Testing if %s is an open resolver tx_id:%s', data.src_ip, query.id)
-            self.write((data.src_ip, 53), query.to_wire()) 
-        # Insure lists do not grow too large
-        while len(lst) > 0 and lst[0].time < datetime.utcnow():
-            del lst[0]
-
-    def refresh_records(self):
-        tree = dns_tree()
-        if args.mapping != None:
-            try:
-                z = zone.from_file(args.mapping, relativize = False)
-                for n in z:
-                    node = dns_tree_node(n)
-                    for rdataset in z[n].rdatasets:
-                        node.rrsets.append(rrset.from_rdata_list(n, rdataset.ttl, rdataset))
-                    tree.add(node)
-            except Exception as e:
-               logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
-        load_experiments(tree, self)
-        print tree
-        self.tree = tree
-
 add_query_db = ("INSERT INTO queries "
                "(exp_id, src_ip, src_port, query, trans_id, ip_id, open, time) "
                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)")
-               
-class QueryData(object):
-    def __init__(self, exp_id, src_ip, src_port, query, trans_id, ip_id):
-        self.exp_id = exp_id.lower()
-        self.src_ip = src_ip
-        self.src_port = src_port
-        self.query = query
-        self.trans_id = trans_id
-        self.ip_id = ip_id
-        self.open = False
-        self.dbtime = datetime.utcnow()
-        self.time = datetime.utcnow() + timedelta(seconds=1)
-        
-    def insert_tuple(self):
-        return (self.exp_id, self.src_ip, self.src_port, self.query, self.trans_id, self.ip_id, int(self.open), self.dbtime)
-               
 class DatabaseInserter(Thread):
     def __init__(self, *args):
         super(DatabaseInserter, self).__init__(*args)
@@ -184,6 +87,86 @@ class DatabaseInserter(Thread):
         self.running = False
         self.addItem(None)
         self.join()
+        
+# Authoritative DNS server for experiments
+class AServer(RawUdpServer):
+    def __init__(self, *args):
+        super(AServer, self).__init__(*args)
+        self.inserter = DatabaseInserter()
+        self.resolvers = defaultdict(list)
+        self.tree = dns_tree()
+
+    def run(self):
+        self.inserter.start()
+        try:
+            super(AServer, self).run()
+        finally:
+            self.inserter.terminate()
+
+    def read(self, pkt):
+        pkt.dns_packet = message.from_wire(pkt.data)
+        if pkt.dns_packet.flags & flags.QR:
+            self.read_response(pkt)
+        else:
+            self.read_request(pkt)
+
+    def read_response(self, pkt):
+        qid = pkt.dns_packet.id
+        qname = pkt.dns_packet.question[0].name
+        qclass = rclass.to_text(pkt.dns_packet.question[0].rdclass)
+        qtype = rtype.to_text(pkt.dns_packet.question[0].rdtype)
+
+        ropen = (pkt.dns_packet.rcode() == rcode.NOERROR and len(pkt.dns_packet.answer) > 0 and pkt.src_addr[0] in self.resolvers)
+        logging.info("Response ip_id:%s tx_id:%s from %s for (%s %s %s) ans:%s", pkt.ip_header.id, qid, pkt.src_addr, str(qname), \
+                    qclass, qtype, (str(pkt.dns_packet.answer[0][0]) if ropen else 'closed'))
+
+        if ropen:
+            for data in self.resolvers[pkt.src_addr[0]]:
+                data.open = True
+            del self.resolvers[pkt.src_addr[0]]
+
+    def read_request(self, pkt):
+        qid = pkt.dns_packet.id
+        qname = pkt.dns_packet.question[0].name
+        qnm = str(qname).lower()
+        qclass = pkt.dns_packet.question[0].rdclass
+        qtype = pkt.dns_packet.question[0].rdtype
+
+        logging.info("Request ip_id:%s tx_id:%s from %s for (%s %s %s)", pkt.ip_header.id, qid, pkt.src_addr, \
+                    str(qname), rclass.to_text(qclass), rtype.to_text(qtype))
+
+        reply = message.make_response(pkt.dns_packet)
+        # Lookup to see if this name is in one of our zone files
+        self.tree.respond(pkt, reply)
+        
+        self.write(pkt.src_addr, reply.to_wire())
+        
+    def check_resolver(self, data):
+        lst = self.resolvers[data.src_ip]
+        lst.append(data)
+        # Limit the number of probes that we send
+        if len(lst) % 4 == 1:
+            query = message.make_query('google.com.', rtype.A) # Arbitrary domain name
+            logging.info('Testing if %s is an open resolver tx_id:%s', data.src_ip, query.id)
+            self.write((data.src_ip, 53), query.to_wire()) 
+        # Insure lists do not grow too large
+        while len(lst) > 0 and lst[0].time < datetime.utcnow():
+            del lst[0]
+
+    def refresh_records(self):
+        tree = dns_tree()
+        if args.mapping != None:
+            try:
+                z = zone.from_file(args.mapping, relativize = False)
+                for n in z:
+                    node = dns_tree_node(n)
+                    for rdataset in z[n].rdatasets:
+                        node.rrsets.append(rrset.from_rdata_list(n, rdataset.ttl, rdataset))
+                    tree.add(node)
+            except Exception as e:
+               logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
+        load_experiments(tree, self)
+        self.tree = tree
         
 if __name__ == "__main__":
     # set up command line args

@@ -22,7 +22,7 @@ class dns_tree_node(object):
         for rr in self.rrsets:
             if rr.rdclass == query.dns_packet.question[0].rdclass and rr.rdtype == query.dns_packet.question[0].rdtype:
                 response.answer.append(rr)
-                reply.flags |= flags.AA
+                response.flags |= flags.AA
                 return
         # Not present, return NODATA
 
@@ -62,22 +62,22 @@ class dns_tree(object):
         return None
         
     def respond(self, query, response):
-        print "find {0}".format(query.dns_packet.question[0].name)
+        #print "find {0}".format(query.dns_packet.question[0].name)
         return self._respond(query, response, self.roots)
         
     def _respond(self, query, response, nodes):
-        print nodes
+        #print nodes
         for n in nodes:
             reln, _, labels = n.name.fullcompare(query.dns_packet.question[0].name)
             if reln == dnsname.NAMERELN_SUPERDOMAIN: # Recurse into children
-                print "{0} is super".format(n)
+                #print "{0} is super".format(n)
                 return self._respond(query, response, n.children)
             elif reln == dnsname.NAMERELN_EQUAL or (labels == len(n.name.labels) - 1 and n.name.is_wild()): # Found the node
-                print "{0} matches".format(n)
+                #print "{0} matches".format(n)
                 n.respond(query, response)
                 return True
             elif reln == dnsname.NAMERELN_SUBDOMAIN: # Falls into a gap in the tree
-                print "{0} is sub".format(n)
+                #print "{0} is sub".format(n)
                 return False
         # Does not match any node
         return False
