@@ -8,10 +8,11 @@ import dpkt
 import socket
 
 class RawPacket(object):
-    def __init__(self, ippkt, udppkt, data):
+    def __init__(self, ippkt, udppkt, data, raw):
         self.ip_header = ippkt
         self.udp_header = udppkt
         self.data = data
+        self.raw = raw
         self.src_addr = (socket.inet_ntoa(ippkt.src), udppkt.sport)
 
 # Template for a raw socket udp server               
@@ -36,7 +37,7 @@ class RawUdpServer(object):
                     continue
 
                 # Process the packet
-                self.read(RawPacket(ippkt, udppkt, udppkt.data))
+                self.read(RawPacket(ippkt, udppkt, udppkt.data, data))
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception as e:

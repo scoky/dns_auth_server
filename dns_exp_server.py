@@ -11,6 +11,7 @@ from raw_server import RawUdpServer
 from collections import defaultdict
 from datetime import datetime,timedelta
 from threading import Thread,Timer
+import base64
 
 try:
     import dns.zone as zone
@@ -104,6 +105,7 @@ class AServer(RawUdpServer):
             self.inserter.terminate()
 
     def read(self, pkt):
+        logging.info("Packet: %s", base64.b64encode(pkt.raw))
         pkt.dns_packet = message.from_wire(pkt.data)
         if pkt.dns_packet.flags & flags.QR:
             self.read_response(pkt)
