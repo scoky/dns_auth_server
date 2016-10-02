@@ -157,16 +157,16 @@ class AServer(RawUdpServer):
 
     def refresh_records(self):
         tree = dns_tree()
-        if args.mapping != None:
+        for mapping in args.mapping:
             try:
-                z = zone.from_file(args.mapping, relativize = False)
+                z = zone.from_file(mapping, relativize = False)
                 for n in z:
                     node = dns_tree_node(n)
                     for rdataset in z[n].rdatasets:
                         node.rrsets.append(rrset.from_rdata_list(n, rdataset.ttl, rdataset))
                     tree.add(node)
             except Exception as e:
-               logging.error('Error in mapping file: %s\n%s', e, traceback.format_exc())
+               logging.error('Error in mapping file %s: %s\n%s', mapping, e, traceback.format_exc())
         load_experiments(tree, self)
         self.tree = tree
         
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,\
                                      description='A simple authoritative DNS server implementation for experiments')
     parser.add_argument('-a', '--address', default='0.0.0.0:53', help='Address to bind upon')                                     
-    parser.add_argument('-m', '--mapping', default=None, help='File containing name to address mappings')
+    parser.add_argument('-m', '--mapping', nargs='+', default=[], help='File containing name to address mappings')
     parser.add_argument('-u', '--username', default='root')
     parser.add_argument('-p', '--password', default=None)
     parser.add_argument('-q', '--quiet', action='store_true', default=False, help='only print errors')
