@@ -6,6 +6,8 @@ import logging
 import traceback
 import dpkt
 import socket
+import struct
+import array
 
 class RawPacket(object):
     def __init__(self, ippkt, udppkt, data, raw):
@@ -52,10 +54,30 @@ class RawUdpServer(object):
         self.running = False
         # Wait for run to return?
         self.sock.close()
-        
+
+    if struct.pack("H",1) == "\x00\x01": # big endian
+        def checksum(self, pkt):
+            if len(pkt) % 2 == 1:
+                pkt += "\0"
+            s = sum(array.array("H", pkt))
+            s = (s >> 16) + (s & 0xffff)
+            s += s >> 16
+            s = ~s
+            return s & 0xffff
+    else:
+        def checksum(self, pkt):
+            if len(pkt) % 2 == 1:
+                pkt += "\0"
+            s = sum(array.array("H", pkt))
+            s = (s >> 16) + (s & 0xffff)
+            s += s >> 16
+            s = ~s
+            return (((s>>8)&0xff)|s<<8) & 0xffff
+
     def write(self, daddr, data):
         udpdata = dpkt.udp.UDP(sport = self.port, dport = daddr[1], data = data)
         udpdata.ulen = len(udpdata)
+        udpdata.sum = self.checksum(str(udpdata))
         # Cannot generate own IP header (i.e., no spoofing?)
         #ipdata = dpkt.ip.IP(src = self.addr, dst = socket.inet_aton(daddr[0]), data = udpdata)
         self.sock.sendto(str(udpdata), daddr)
@@ -63,6 +85,7 @@ class RawUdpServer(object):
     def writefrom(self, daddr, saddr, data):
         udpdata = dpkt.udp.UDP(sport = saddr[1], dport = daddr[1], data = data)
         udpdata.ulen = len(udpdata)
+        udpdata.sum = self.checksum(str(udpdata))
         # Cannot generate own IP header (i.e., no spoofing?)
         #ipdata = dpkt.ip.IP(src = self.addr, dst = socket.inet_aton(daddr[0]), data = udpdata)
         self.sock.sendto(str(udpdata), daddr)
