@@ -77,7 +77,7 @@ class RawUdpServer(object):
     def write(self, daddr, data):
         udpdata = dpkt.udp.UDP(sport = self.port, dport = daddr[1], data = data)
         udpdata.ulen = len(udpdata)
-        udpdata.sum = self.checksum(str(udpdata))
+        udpdata.sum = self.checksum(self.addr + socket.inet_aton(daddr[0]) + struct.pack('!BBH', 0, 17, len(udpdata)) + str(udpdata))
         # Cannot generate own IP header (i.e., no spoofing?)
         #ipdata = dpkt.ip.IP(src = self.addr, dst = socket.inet_aton(daddr[0]), data = udpdata)
         self.sock.sendto(str(udpdata), daddr)
@@ -85,7 +85,7 @@ class RawUdpServer(object):
     def writefrom(self, daddr, saddr, data):
         udpdata = dpkt.udp.UDP(sport = saddr[1], dport = daddr[1], data = data)
         udpdata.ulen = len(udpdata)
-        udpdata.sum = self.checksum(str(udpdata))
+        udpdata.sum = self.checksum(socket.inet_aton(saddr[0]) + socket.inet_aton(daddr[0]) + struct.pack('!BBH', 0, 17, len(udpdata)) + str(udpdata))
         # Cannot generate own IP header (i.e., no spoofing?)
         #ipdata = dpkt.ip.IP(src = self.addr, dst = socket.inet_aton(daddr[0]), data = udpdata)
         self.sock.sendto(str(udpdata), daddr)
