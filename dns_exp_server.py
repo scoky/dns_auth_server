@@ -174,7 +174,7 @@ if __name__ == "__main__":
     # set up command line args
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,\
                                      description='A simple authoritative DNS server implementation for experiments')
-    parser.add_argument('-a', '--address', default='0.0.0.0:53', help='Address to bind upon')                                     
+    parser.add_argument('-a', '--address', default='0.0.0.0:53', help='Address to bind upon')
     parser.add_argument('-m', '--mapping', nargs='+', default=[], help='File containing name to address mappings')
     parser.add_argument('-u', '--username', default='root')
     parser.add_argument('-p', '--password', default=None)

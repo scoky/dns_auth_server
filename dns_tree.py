@@ -21,7 +21,7 @@ class dns_tree_node(object):
     def respond(self, query, response):
         for rr in self.rrsets:
             if rr.rdtype == rtype.NS:
-                reponse.authority.append(rr)
+                response.authority.append(rr)
             elif rr.rdclass == query.dns_packet.question[0].rdclass and rr.rdtype == query.dns_packet.question[0].rdtype:
                 response.answer.append(rr)
                 response.flags |= flags.AA
