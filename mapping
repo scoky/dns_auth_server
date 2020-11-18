@@ -1,8 +1,13 @@
 ; This is a comment
 ; qname qclass qtype ttl ans
 $ORIGIN exp.schomp.info.
-@        3600   IN      SOA     ns1.schomp.info. admin.schomp.info. 1474557685 3600 3600 3600 1
-@        3600   IN      NS      ns1.schomp.info.
-@        3600   IN      NS      ns2.schomp.info.
-test     3600   IN      A       1.1.1.1
-dnstool  3600   IN      A       52.70.143.0
+$TTL 3600
+@        	IN      SOA     ns1.schomp.info. admin.schomp.info. 1474557685 3600 3600 3600 1
+@        	IN      NS      ns1.schomp.info.
+@        	IN      NS      ns2.schomp.info.
+test     	IN      A       1.1.1.1
+dnstool  	IN      A       52.70.143.0
+dnstool		IN	CAA	0 issue "letsencrypt.org"
+www.dnstool 	IN	A	52.70.143.0
+www.dnstool	IN	CAA	0 issue "letsencrypt.org"
+a_b.dnstool	IN	A	52.70.143.0

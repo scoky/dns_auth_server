@@ -22,6 +22,8 @@ class RawUdpServer(object):
     def __init__(self, addr):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_UDP)
         self.sock.bind(addr)
+        self.sock_silent = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.sock_silent.bind(addr)
         self.running = False
         self.addr = socket.inet_aton(addr[0])
         self.port = addr[1]
@@ -54,6 +56,7 @@ class RawUdpServer(object):
         self.running = False
         # Wait for run to return?
         self.sock.close()
+        self.sock_silent.close()
 
     if struct.pack("H",1) == "\x00\x01": # big endian
         def checksum(self, pkt):
