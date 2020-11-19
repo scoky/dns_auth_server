@@ -111,6 +111,7 @@ class examine_tree_node(dns_tree_node):
         # Need addresses and ip_header
         if query.dns_packet.question[0].rdtype == rtype.TXT:
             txt = {
+                'time' : datetime.utcnow(),
                 'ip' : {
                     'tos' : query.ip_header.tos,
                     'len' : query.ip_header.len,
@@ -131,13 +132,14 @@ class examine_tree_node(dns_tree_node):
                     'id' : query.dns_packet.id,
                     'flags' : "{0:b}".format(query.dns_packet.flags),
                     'edns' : query.dns_packet.edns,
+                    'ednsflags' : query.dns_packet.ednsflags,
                     'payload' : query.dns_packet.payload,
-                    'options' : [option.to_text() for option in query.dns_packet.options]
+                    'options' : [{'type' : option.otype, 'data' : option.data} for option in query.dns_packet.options]
                 }
             }
             import json
             reply.flags |= flags.AA
-            reply.answer.append(rrset.from_text(query.dns_packet.question[0].name, 1, rclass.IN, rtype.TXT, json.dumps(txt)))
+            reply.answer.append(rrset.from_text(query.dns_packet.question[0].name, 1, rclass.IN, rtype.TXT, json.dumps(txt).replace('"', '\\"')))
 
 class chain_tree_node(dns_tree_node):
     DEFAULT_NAME = '*.chain.exp.schomp.info.'
