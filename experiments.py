@@ -19,6 +19,7 @@ def load_experiments(tree, server):
     tree.add(recursion_tree_node())
     tree.add(dnstool_tree_node(server))
     tree.add(stat_tree_node())
+    tree.add(examine_tree_node())
     tree.add(chain_tree_node())
     # TODO: Add other tools HERE!
 
@@ -100,6 +101,43 @@ class stat_tree_node(dns_tree_node):
                 "RESOLVER=%s PORT=%s QUERY=%s TRANSACTION=%s IPID=%s TIME=%s" % (query.src_addr[0], \
                 query.src_addr[1], query.dns_packet.question[0].name, query.dns_packet.id, query.ip_header.id, \
                 datetime.utcnow())))
+
+class examine_tree_node(dns_tree_node):
+    DEFAULT_NAME = '*.examine.exp.schomp.info.'
+    def __init__(self):
+        super(examine_tree_node, self).__init__(dnsname.from_text(self.DEFAULT_NAME))
+    
+    def respond(self, query, reply):
+        # Need addresses and ip_header
+        if query.dns_packet.question[0].rdtype == rtype.TXT:
+            txt = {
+                'ip' : {
+                    'tos' : query.ip_header.tos,
+                    'len' : query.ip_header.len,
+                    'src_ip' : query.src_addr[0],
+                    'id' : query.ip_header.id,
+                    'off' : query.ip_header.off,
+                    'ttl' : query.ip_header.ttl,
+                    'proto' : query.ip_header.p,
+                    'cs' : query.ip_header.sum,
+                    
+                },
+                'udp' : {
+                    'src_port' : query.src_addr[1],
+                    'len' : query.udp_header.ulen,
+                    'cs' : query.udp_header.sum
+                },
+                'dns': {
+                    'id' : query.dns_packet.id,
+                    'flags' : "{0:b}".format(query.dns_packet.flags),
+                    'edns' : query.dns_packet.edns,
+                    'payload' : query.dns_packet.payload,
+                    'options' : [option.to_text() for option in query.dns_packet.options]
+                }
+            }
+            import json
+            reply.flags |= flags.AA
+            reply.answer.append(rrset.from_text(query.dns_packet.question[0].name, 1, rclass.IN, rtype.TXT, json.dumps(txt)))
 
 class chain_tree_node(dns_tree_node):
     DEFAULT_NAME = '*.chain.exp.schomp.info.'
