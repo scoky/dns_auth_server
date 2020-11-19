@@ -111,7 +111,7 @@ class examine_tree_node(dns_tree_node):
         # Need addresses and ip_header
         if query.dns_packet.question[0].rdtype == rtype.TXT:
             txt = {
-                'time' : datetime.utcnow(),
+                'time' : str(datetime.utcnow()),
                 'ip' : {
                     'tos' : query.ip_header.tos,
                     'len' : query.ip_header.len,
