@@ -139,7 +139,7 @@ class examine_tree_node(dns_tree_node):
             }
             import json
             reply.flags |= flags.AA
-            reply.answer.append(rrset.from_text(query.dns_packet.question[0].name, 1, rclass.IN, rtype.TXT, json.dumps(txt).replace('"', '\\"')))
+            reply.answer.append(rrset.from_text(query.dns_packet.question[0].name, 1, rclass.IN, rtype.TXT, '"' + json.dumps(txt).replace('"', '\\"') + '"'))
 
 class chain_tree_node(dns_tree_node):
     DEFAULT_NAME = '*.chain.exp.schomp.info.'
