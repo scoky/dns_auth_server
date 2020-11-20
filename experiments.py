@@ -130,10 +130,10 @@ class examine_tree_node(dns_tree_node):
                 },
                 'dns': {
                     'id' : query.dns_packet.id,
-                    'qname' : query.dns_packet.question[0].name,
+                    'qname' : str(query.dns_packet.question[0].name),
                     'flags' : "{0:b}".format(query.dns_packet.flags),
                     'edns' : query.dns_packet.edns,
-                    'ednsflags' : query.dns_packet.ednsflags,
+                    'ednsflags' : "{0:b}".format(query.dns_packet.ednsflags),
                     'payload' : query.dns_packet.payload,
                     'options' : [{'type' : option.otype, 'data' : option.data} for option in query.dns_packet.options]
                 }
