@@ -140,8 +140,9 @@ class examine_tree_node(dns_tree_node):
             import json
             txt = json.dumps(txt).replace('"', '\\"')
             n = 255
+            txt = ' '.join(['"' + txt[i:i+n] + '"' for i in range(0, len(txt), n)])
             reply.flags |= flags.AA
-            reply.answer.append(rrset.from_text_list(query.dns_packet.question[0].name, 1, rclass.IN, rtype.TXT, [txt[i:i+n] for i in range(0, len(txt), n)]))
+            reply.answer.append(rrset.from_text(query.dns_packet.question[0].name, 1, rclass.IN, rtype.TXT, txt))
 
 class chain_tree_node(dns_tree_node):
     DEFAULT_NAME = '*.chain.exp.schomp.info.'
