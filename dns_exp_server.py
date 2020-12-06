@@ -21,7 +21,7 @@ try:
     import dns.rrset as rrset
     import dns.rcode  as rcode
     from dns import message
-except:
+except ImportError:
     raise Exception('Is dnspython installed?')
 
 from dns_tree import dns_tree,dns_tree_node
